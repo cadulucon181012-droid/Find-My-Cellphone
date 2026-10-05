@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0f172a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Find My Phone</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{background:#0f172a;color:#f8fafc;min-height:100vh;padding:22px 16px;display:flex;flex-direction:column;align-items:center;gap:18px;transition:.08s}
+body.flashing{background:#fff;color:#111}
+header{text-align:center;padding-top:8px}
+h1{font-size:30px;color:#38bdf8}
+.subtitle{color:#94a3b8;font-size:14px;margin-top:4px}
+.card{width:100%;max-width:390px;background:#1e293b;border-radius:18px;padding:16px;box-shadow:0 8px 30px #0004}
+.main{display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:8px}
+#toggleBtn{width:190px;height:190px;border-radius:50%;border:4px solid #38bdf8;background:radial-gradient(circle,#1e293b,#0f172a);color:#38bdf8;font-size:19px;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;box-shadow:0 0 28px #38bdf844}
+#toggleBtn.active{border-color:#ef4444;color:#f87171;background:radial-gradient(circle,#450a0a,#1e1b4b);animation:pulse 1.4s infinite}
+@keyframes pulse{50%{transform:scale(1.035)}}
+.icon{font-size:42px}
+.status{padding:7px 15px;border-radius:99px;background:#334155;color:#cbd5e1;font-size:14px;text-align:center}
+.status.active{background:#14532d;color:#4ade80}
+h2{font-size:16px;margin-bottom:14px;color:#cbd5e1}
+.row{display:flex;flex-direction:column;gap:7px;margin-bottom:15px}
+label{font-size:13px;color:#94a3b8}
+input[type=range]{width:100%;accent-color:#38bdf8}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+button.action{background:#334155;color:#f8fafc;border:1px solid #475569;border-radius:10px;padding:12px 8px;font-weight:650;font-size:14px}
+button.action:active{transform:scale(.98)}
+#stopBtn{display:none;grid-column:1/-1;background:#b91c1c;border:0;padding:14px}
+.help{font-size:12px;line-height:1.45;color:#94a3b8}
+.hidden{display:none}
+.notice{font-size:12px;color:#cbd5e1;line-height:1.5;background:#0f172a;padding:11px;border-radius:10px;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Find My Phone</h1>
+  <p class="subtitle">Bata palmas para encontrar seu celular</p>
+</header>
+
+<div class="card main">
+  <button id="toggleBtn" aria-label="Ativar busca">
+    <span class="icon" id="btnIcon">🎤</span>
+    <span id="btnText">Ativar busca</span>
+  </button>
+  <div id="status" class="status">Monitoramento desligado</div>
+</div>
+
+<div class="card">
+  <h2>⚙️ Configurações do alarme</h2>
+
+  <div class="row">
+    <label for="sensitivity">Sensibilidade: <b id="sensText">Média</b></label>
+    <input id="sensitivity" type="range" min="8" max="45" value="22">
+  </div>
+
+  <div class="grid">
+    <button class="action" id="recordBtn">🎙️ Gravar alarme</button>
+    <button class="action" id="chooseBtn">📁 Escolher áudio</button>
+    <input id="audioFile" class="hidden" type="file" accept="audio/*">
+    <button class="action" id="testBtn" style="grid-column:1/-1">🔊 Testar alarme</button>
+    <button class="action" id="stopBtn">⛔ PARAR ALARME</button>
+  </div>
+
+  <div class="notice">
+    O microfone e a lanterna dependem das permissões do Chrome. Para usar a detecção de palmas, abra este app por um endereço <b>HTTPS</b>.
+  </div>
+</div>
+
+<div class="card">
+  <p class="help">
+    💡 Dica: depois de publicar o app, você pode usar o menu do Chrome → <b>Adicionar à tela inicial</b>.
+    O botão de ativação deve ser tocado enquanto a página estiver aberta.
+  </p>
+</div>
+
+<script>
+let listening=false;
+let alarming=false;
+let audioCtx=null;
+let analyser=null;
+let micStream=null;
+let cameraStream=null;
+let torchTrack=null;
+let rafId=null;
+let wakeLock=null;
+let flashTimer=null;
+let customAudio=null;
+let customAudioURL=null;
+let mediaRecorder=null;
+let recordedChunks=[];
+let sirenCtx=null;
+let sirenOsc=null;
+let sirenGain=null;
+let lastClap=0;
+
+const toggleBtn=document.getElementById("toggleBtn");
+const btnText=document.getElementById("btnText");
+const btnIcon=document.getElementById("btnIcon");
+const status=document.getElementById("status");
+const sensitivity=document.getElementById("sensitivity");
+const sensText=document.getElementById("sensText");
+const recordBtn=document.getElementById("recordBtn");
+const chooseBtn=document.getElementById("chooseBtn");
+const audioFile=document.getElementById("audioFile");
+const testBtn=document.getElementById("testBtn");
+const stopBtn=document.getElementById("stopBtn");
+
+sensitivity.addEventListener("input",()=>{
+  const v=Number(sensitivity.value);
+  sensText.textContent=v<17?"Baixa":v<32?"Média":"Alta";
+});
+
+toggleBtn.addEventListener("click",()=>listening?stopListening():startListening());
+
+async function startListening(){
+  if(!window.isSecureContext){
+    alert("Este app precisa ser aberto por HTTPS para usar o microfone. Publique o index.html no Vercel ou GitHub Pages e abra o link HTTPS.");
+    return;
+  }
+  if(!navigator.mediaDevices?.getUserMedia){
+    alert("Seu navegador não disponibilizou acesso ao microfone.");
+    return;
+  }
+
+  try{
+    micStream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},
+      video:false
+    });
+
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    await audioCtx.resume();
+
+    analyser=audioCtx.createAnalyser();
+    analyser.fftSize=1024;
+    analyser.smoothingTimeConstant=.15;
+
+    const source=audioCtx.createMediaStreamSource(micStream);
+    source.connect(analyser);
+
+    try{
+      cameraStream=await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:{ideal:"environment"}}
+      });
+      const track=cameraStream.getVideoTracks()[0];
+      const caps=track.getCapabilities?.()||{};
+      if(caps.torch) torchTrack=track;
+      else{
+        cameraStream.getTracks().forEach(t=>t.stop());
+        cameraStream=null;
+      }
+    }catch(e){
+      console.log("Lanterna física indisponível",e);
+    }
+
+    if("wakeLock" in navigator){
+      try{wakeLock=await navigator.wakeLock.request("screen")}catch(e){}
+    }
+
+    listening=true;
+    toggleBtn.classList.add("active");
+    btnText.textContent="Desativar busca";
+    btnIcon.textContent="👂";
+    status.textContent="Monitorando palmas...";
+    status.classList.add("active");
+    detectClap();
+
+  }catch(err){
+    cleanupStreams();
+    alert("Não foi possível acessar o microfone. Permita o microfone no Chrome e confirme que você abriu o app por HTTPS.\n\nDetalhe: "+err.message);
+  }
+}
+
+function detectClap(){
+  if(!listening||!analyser)return;
+
+  const data=new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(data);
+
+  let sum=0;
+  for(let i=0;i<data.length;i++){
+    const x=(data[i]-128)/128;
+    sum+=x*x;
+  }
+  const rms=Math.sqrt(sum/data.length);
+
+  const threshold=Number(sensitivity.value)/1000;
+  const now=performance.now();
+
+  if(rms>threshold && now-lastClap>900 && !alarming){
+    lastClap=now;
+    triggerAlarm();
+  }
+
+  rafId=requestAnimationFrame(detectClap);
+}
+
+function stopListening(){
+  listening=false;
+  cancelAnimationFrame(rafId);
+  if(alarming) stopAlarm();
+  cleanupStreams();
+  toggleBtn.classList.remove("active");
+  btnText.textContent="Ativar busca";
+  btnIcon.textContent="🎤";
+  status.textContent="Monitoramento desligado";
+  status.classList.remove("active");
+}
+
+function cleanupStreams(){
+  if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null}
+  if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null}
+  torchTrack=null;
+  if(audioCtx){audioCtx.close().catch(()=>{});audioCtx=null}
+  if(wakeLock){wakeLock.release().catch(()=>{});wakeLock=null}
+}
+
+function triggerAlarm(){
+  if(alarming)return;
+  alarming=true;
+  stopBtn.style.display="block";
+  status.textContent="🚨 CELULAR LOCALIZADO!";
+  status.classList.add("active");
+
+  playAlarm();
+
+  if(navigator.vibrate){
+    navigator.vibrate([500,150,500,150,700]);
+  }
+
+  let state=false;
+  flashTimer=setInterval(()=>{
+    state=!state;
+    document.body.classList.toggle("flashing",state);
+    if(torchTrack){
+      torchTrack.applyConstraints({advanced:[{torch:state}]}).catch(()=>{});
+    }
+  },180);
+}
+
+function playAlarm(){
+  if(customAudio){
+    customAudio.currentTime=0;
+    customAudio.loop=true;
+    customAudio.play().catch(()=>{});
+    return;
+  }
+
+  sirenCtx=new (window.AudioContext||window.webkitAudioContext)();
+  sirenOsc=sirenCtx.createOscillator();
+  sirenGain=sirenCtx.createGain();
+  sirenOsc.type="square";
+  sirenGain.gain.value=.22;
+  sirenOsc.connect(sirenGain);
+  sirenGain.connect(sirenCtx.destination);
+  sirenOsc.start();
+
+  let high=false;
+  const timer=setInterval(()=>{
+    if(!alarming){
+      clearInterval(timer);
+      return;
+    }
+    high=!high;
+    sirenOsc.frequency.setTargetAtTime(high?1200:600,sirenCtx.currentTime,.04);
+  },280);
+}
+
+function stopAlarm(){
+  alarming=false;
+  stopBtn.style.display="none";
+  document.body.classList.remove("flashing");
+
+  if(flashTimer){clearInterval(flashTimer);flashTimer=null}
+  if(torchTrack)torchTrack.applyConstraints({advanced:[{torch:false}]}).catch(()=>{});
+  if(navigator.vibrate)navigator.vibrate(0);
+
+  if(customAudio){
+    customAudio.pause();
+    customAudio.currentTime=0;
+  }
+
+  if(sirenOsc){
+    try{sirenOsc.stop()}catch(e){}
+    sirenOsc=null;
+  }
+  if(sirenCtx){
+    sirenCtx.close().catch(()=>{});
+    sirenCtx=null;
+  }
+
+  if(listening){
+    status.textContent="Monitorando palmas...";
+  }else{
+    status.textContent="Monitoramento desligado";
+    status.classList.remove("active");
+  }
+}
+
+stopBtn.addEventListener("click",stopAlarm);
+
+testBtn.addEventListener("click",()=>{
+  if(alarming)stopAlarm();
+  else triggerAlarm();
+});
+
+chooseBtn.addEventListener("click",()=>audioFile.click());
+
+audioFile.addEventListener("change",e=>{
+  const file=e.target.files?.[0];
+  if(!file)return;
+  if(customAudioURL)URL.revokeObjectURL(customAudioURL);
+  customAudioURL=URL.createObjectURL(file);
+  customAudio=new Audio(customAudioURL);
+  customAudio.loop=true;
+  alert("Áudio personalizado carregado! Toque em 'Testar alarme' para ouvir.");
+});
+
+recordBtn.addEventListener("click",async()=>{
+  if(mediaRecorder?.state==="recording"){
+    mediaRecorder.stop();
+    return;
+  }
+
+  if(!navigator.mediaDevices?.getUserMedia){
+    alert("Seu navegador não permite gravação de áudio.");
+    return;
+  }
+
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    recordedChunks=[];
+
+    const mime=MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ?"audio/webm;codecs=opus":"audio/webm";
+
+    mediaRecorder=new MediaRecorder(stream,{mimeType:mime});
+
+    mediaRecorder.ondataavailable=e=>{
+      if(e.data.size)recordedChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop=()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      const blob=new Blob(recordedChunks,{type:mime});
+      if(customAudioURL)URL.revokeObjectURL(customAudioURL);
+      customAudioURL=URL.createObjectURL(blob);
+      customAudio=new Audio(customAudioURL);
+      customAudio.loop=true;
+      recordBtn.textContent="🎙️ Gravar alarme";
+      alert("Gravação salva como seu alarme personalizado!");
+    };
+
+    mediaRecorder.start();
+    recordBtn.textContent="⏹️ Parar gravação";
+    alert("Gravando... Toque novamente em 'Parar gravação' quando terminar.");
+  }catch(err){
+    alert("Não foi possível gravar. Verifique a permissão do microfone.");
+  }
+});
+
+document.addEventListener("visibilitychange",async()=>{
+  if(document.visibilityState==="visible" && listening && "wakeLock" in navigator && !wakeLock){
+    try{wakeLock=await navigator.wakeLock.request("screen")}catch(e){}
+  }
+});
+</script>
+</body>
+</html>
