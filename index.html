@@ -1,111 +1,525 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Flashlight, Hand, Mic, MicOff, Volume2, Smartphone, VolumeX } from "lucide-react";
-
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Find My Phone — Ache seu celular batendo palmas" },
-      {
-        name: "description",
-        content:
-          "Localize seu celular em qualquer canto da casa. Bata palmas 5 vezes para acionar sirene, lanterna piscante e vibração.",
-      },
-    ],
-  }),
-  component: Index,
-});
-
-const REQUIRED_CLAPS = 5;
-const MIN_SOUND_DURATION_MS = 300; // 0.3s
-const CLAP_TIMEOUT_MS = 4000;
-
-function Index() {
-  const [listening, setListening] = useState(false);
-  const [testingMic, setTestingMic] = useState(false);
-  const [alerting, setAlerting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [torchAvailable, setTorchAvailable] = useState(false);
-  const [sensitivity, setSensitivity] = useState(60);
-  const [currentLevel, setCurrentLevel] = useState(0);
-  const [clapCount, setClapCount] = useState(0);
-
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const videoStreamRef = useRef<MediaStream | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const rafRef = useRef<number>(0);
-  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
-  
-  const soundStartTimeRef = useRef<number | null>(null);
-  const clapCooldownRef = useRef(false);
-  const lastClapTimeRef = useRef(0);
-  const clapCountRef = useRef(0);
-  const sensitivityRef = useRef(60);
-
-  const alarmIntervalRef = useRef<number | null>(null);
-  const torchIntervalRef = useRef<number | null>(null);
-  const vibIntervalRef = useRef<number | null>(null);
-  const alertingRef = useRef(false);
-
-  useEffect(() => {
-    sensitivityRef.current = sensitivity;
-  }, [sensitivity]);
-
-  const stopTorch = useCallback(async () => {
-    if (torchIntervalRef.current) {
-      clearInterval(torchIntervalRef.current);
-      torchIntervalRef.current = null;
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Find My Phone</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --primary: #238636;
+      --primary-hover: #2ea043;
+      --danger: #da3633;
+      --danger-hover: #f85149;
+      --warning: #d29922;
+      --text: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
     }
-    const track = videoStreamRef.current?.getVideoTracks()[0];
-    if (track) {
-      try {
-        await track.applyConstraints({ advanced: [{ torch: false } as MediaTrackConstraintSet] });
-      } catch {}
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
-  }, []);
 
-  const stopAlert = useCallback(async () => {
-    alertingRef.current = false;
-    setAlerting(false);
-
-    if (alarmIntervalRef.current) {
-      clearInterval(alarmIntervalRef.current);
-      alarmIntervalRef.current = null;
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      transition: background-color 0.15s;
     }
-    if (vibIntervalRef.current) {
-      clearInterval(vibIntervalRef.current);
-      vibIntervalRef.current = null;
+
+    body.alarm-flash-1 { background-color: #ff0033 !important; }
+    body.alarm-flash-2 { background-color: #ffffff !important; color: #000 !important; }
+
+    .app-container {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
-    if ("vibrate" in navigator) {
-      navigator.vibrate(0);
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
     }
-    await stopTorch();
-  }, [stopTorch]);
 
-  const beep = useCallback(() => {
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(800, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + 0.2);
-    gain.gain.setValueAtTime(0.01, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.8, ctx.currentTime + 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.38);
-  }, []);
+    h1, h2, h3 { margin-bottom: 8px; font-weight: 600; }
+    h1 { font-size: 1.5rem; text-align: center; }
+    p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.4; }
 
-  const triggerAlert = useCallback(async () => {
-    if (alertingRef.current) return;
-    alertingRef.current = true;
-    setAlerting(true);
+    button {
+      background: #21262d;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      transition: all 0.2s;
+    }
+    button:active { transform: scale(0.98); }
+    button.btn-primary { background: var(--primary); border-color: var(--primary); }
+    button.btn-primary:hover { background: var(--primary-hover); }
+    button.btn-danger { background: var(--danger); border-color: var(--danger); }
+    button.btn-danger:hover { background: var(--danger-hover); }
+    button.btn-accent { background: #1f6feb; border-color: #388bfd; }
 
-    beep();
-    alarmIntervalRef.current = window.setInterval(beep, 400);
+    /* Indicador de Status do Microfone */
+    .status-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: #111418;
+    }
+    .status-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .status-banner.idle .status-dot { background: var(--text-muted); }
+    .status-banner.waiting {
+      border-color: var(--warning);
+      background: rgba(210, 153, 34, 0.15);
+      color: #e3b341;
+    }
+    .status-banner.waiting .status-dot {
+      background: var(--warning);
+      animation: pulse 1.2s infinite;
+    }
+    .status-banner.active {
+      border-color: var(--primary);
+      background: rgba(35, 134, 54, 0.15);
+      color: #3fb950;
+    }
+    .status-banner.active .status-dot {
+      background: #3fb950;
+      box-shadow: 0 0 10px #3fb950;
+      animation: pulse 1.5s infinite;
+    }
+    .status-banner.blocked {
+      border-color: var(--danger);
+      background: rgba(218, 54, 51, 0.15);
+      color: #f85149;
+    }
+    .status-banner.blocked .status-dot { background: var(--danger); }
 
-    if ("vibrate" in navigator) {
-      navigator.
+    @keyframes pulse {
+      0% { opacity: 0.4; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); }
+      100% { opacity: 0.4; transform: scale(0.9); }
+    }
+
+    /* Seletor de Modo */
+    .mode-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .mode-btn {
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      border: 1px solid var(--border);
+      background: #0d1117;
+      text-align: center;
+      cursor: pointer;
+    }
+    .mode-btn.selected {
+      border-color: var(--accent);
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent);
+    }
+
+    /* Sliders e Controles */
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 12px 0 6px;
+      font-size: 0.85rem;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      height: 6px;
+      border-radius: 3px;
+      background: #21262d;
+    }
+
+    .meter-container {
+      height: 10px;
+      background: #21262d;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      background: #3fb950;
+      transition: width 0.05s ease-out;
+    }
+
+    /* Estrelas de Feedback */
+    .star-rating {
+      display: flex;
+      gap: 10px;
+      font-size: 2rem;
+      cursor: pointer;
+      justify-content: center;
+      margin: 14px 0;
+    }
+    .star { color: #30363d; transition: color 0.15s; }
+    .star.active { color: #f1e05a; }
+
+    textarea, input[type="text"], input[type="email"] {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      color: var(--text);
+      font-size: 0.95rem;
+      margin-top: 6px;
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    .feedback-item {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 0;
+    }
+    .feedback-item:last-child { border-bottom: none; }
+    .feedback-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .tutorial-item {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tutorial-item:last-child { border-bottom: none; }
+    .tutorial-item strong { color: var(--accent); display: block; margin-bottom: 4px; }
+
+    .screen { display: none; }
+    .screen.active-screen { display: flex; flex-direction: column; gap: 14px; }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- ==================== TELA DE AUTENTICAÇÃO ==================== -->
+    <div id="screen-auth" class="card screen active-screen">
+      <h1>Find My Phone</h1>
+      <p style="text-align: center;">Localize seu aparelho tocando palmas ou chamando por voz.</p>
+
+      <div style="margin-top: 16px;">
+        <label style="font-size: 0.85rem; color: var(--text-muted);">Entrar com seu e-mail</label>
+        <input type="email" id="auth-email-input" placeholder="seu@email.com" />
+      </div>
+
+      <div id="otp-section" style="display: none; margin-top: 10px;">
+        <label style="font-size: 0.85rem; color: var(--text-muted);">Código de 4 dígitos</label>
+        <input type="text" id="otp-input" maxlength="4" placeholder="Ex: 1234" />
+        <p id="otp-timer" style="margin-top: 6px; font-size: 0.8rem; color: var(--warning);">Tempo restante: 300s</p>
+        <button id="btn-verify-otp" class="btn-primary" style="margin-top: 8px;">Confirmar Código</button>
+      </div>
+
+      <button id="btn-send-code" class="btn-primary" style="margin-top: 10px;">Continuar com E-mail</button>
+      
+      <div style="text-align: center; margin: 10px 0; color: var(--text-muted); font-size: 0.8rem;">ou</div>
+      
+      <button id="btn-google-login">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c-.3-.7-.5-1.5-.5-2.4z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z"/></svg>
+        Entrar com Google
+      </button>
+    </div>
+
+    <!-- ==================== TELA PRINCIPAL ==================== -->
+    <div id="screen-main" class="screen">
+      <!-- Barra Superior / Perfil -->
+      <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px;">
+        <span id="user-display" style="font-size: 0.85rem; color: var(--accent);">conta@exemplo.com</span>
+        <button id="btn-logout" style="width: auto; padding: 6px 12px; font-size: 0.8rem;">Sair</button>
+      </div>
+
+      <!-- Banner de Status do Microfone -->
+      <div id="mic-status-banner" class="status-banner idle">
+        <div class="status-dot"></div>
+        <div id="mic-status-text">Escuta inativa. Clique em "Ativar Busca".</div>
+      </div>
+
+      <!-- Card Principal de Controle -->
+      <div class="card">
+        <h3>Modo de Disparo</h3>
+        <p>Configuração permanente salva na sua conta:</p>
+
+        <div class="mode-selector">
+          <div id="mode-claps" class="mode-btn selected">👏 5 Palmas</div>
+          <div id="mode-voice" class="mode-btn">🎙️ Voz ("Find My")</div>
+        </div>
+
+        <button id="btn-toggle-listen" class="btn-primary" style="margin-top: 8px;">
+          Ativar Busca do Celular
+        </button>
+
+        <div style="margin-top: 14px;">
+          <div class="control-row">
+            <span>Sensibilidade do Som (1 a 100)</span>
+            <span id="sens-value" style="font-weight: 600;">60</span>
+          </div>
+          <input type="range" id="sensitivity-slider" min="10" max="100" step="10" value="60" />
+        </div>
+
+        <div style="margin-top: 12px;">
+          <div class="control-row">
+            <span>Volume Atual Captado:</span>
+            <span id="current-volume">0%</span>
+          </div>
+          <div class="meter-container">
+            <div id="volume-meter" class="meter-fill"></div>
+          </div>
+        </div>
+
+        <div id="claps-counter-box" style="margin-top: 12px; font-size: 0.85rem; color: var(--accent);">
+          Palmas detectadas na janela atual: <strong id="claps-count">0</strong> / 5
+        </div>
+      </div>
+
+      <!-- Card de Sons e Ações de Alarme -->
+      <div class="card">
+        <h3>Alarme Sonoro</h3>
+        <p>Personalize o som de busca ou use a sirene nativa:</p>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+          <button id="btn-record-audio">🎙️ Gravar Meu Próprio Alarme</button>
+          
+          <button id="btn-import-audio">📂 Exportar/Importar Áudio do Aparelho</button>
+          <input type="file" id="file-input" accept="audio/*" style="display: none;" />
+
+          <div id="custom-audio-info" style="font-size: 0.8rem; color: var(--accent); display: none;">
+            ✓ Áudio personalizado carregado
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;">
+            <button id="btn-test-alarm" class="btn-accent">Testar Alarme</button>
+            <button id="btn-stop-alarm" class="btn-danger">Parar Alarme</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navegação Secundária -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button id="btn-open-tutorial">📖 Como Usar</button>
+        <button id="btn-open-feedback" style="border-color: var(--accent); color: var(--accent);">⭐ Dar Feedback</button>
+      </div>
+    </div>
+
+    <!-- ==================== TELA DE FEEDBACK ==================== -->
+    <div id="screen-feedback" class="card screen">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <h2>Avaliação e Feedback</h2>
+        <button id="btn-close-feedback" style="width: auto; padding: 4px 10px; font-size: 0.8rem;">Voltar</button>
+      </div>
+      <p>Dê uma nota e deixe uma mensagem para ajudar a melhorar o app:</p>
+
+      <div class="star-rating" id="star-rating">
+        <span class="star active" data-value="1">★</span>
+        <span class="star active" data-value="2">★</span>
+        <span class="star active" data-value="3">★</span>
+        <span class="star active" data-value="4">★</span>
+        <span class="star active" data-value="5">★</span>
+      </div>
+      <div style="text-align: center; font-size: 0.85rem; color: var(--text-muted);" id="rating-label">5 estrelas</div>
+
+      <textarea id="feedback-comment" placeholder="Escreva aqui sua experiência ou sugestão..."></textarea>
+      <button id="btn-submit-feedback" class="btn-primary" style="margin-top: 10px;">Enviar Feedback</button>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;" />
+
+      <h3>Mural de Feedbacks da Comunidade</h3>
+      <p>Veja o que os usuários dizem sobre o Find My Phone:</p>
+      
+      <div id="feedback-list" style="margin-top: 10px; max-height: 220px; overflow-y: auto;">
+        <!-- Preenchido via JavaScript -->
+      </div>
+    </div>
+
+    <!-- ==================== TELA DE TUTORIAL COMPLETO ==================== -->
+    <div id="screen-tutorial" class="card screen">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <h2>Como se usa essa plataforma</h2>
+        <button id="btn-close-tutorial" style="width: auto; padding: 4px 10px; font-size: 0.8rem;">Voltar</button>
+      </div>
+      <p>Guia detalhado de cada botão e recurso disponível no aplicativo:</p>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px; font-size: 0.88rem; max-height: 480px; overflow-y: auto; padding-right: 4px;">
+        
+        <div class="tutorial-item">
+          <strong>🟢 Indicador de Status do Microfone</strong>
+          <p>Localizado no topo da tela principal. Ele muda de cor para você saber o estado da escuta:</p>
+          <p>• <em>Cinza:</em> Busca desligada.</p>
+          <p>• <em>Amarelo piscando:</em> Aguardando você autorizar o microfone no Chrome.</p>
+          <p>• <em>Verde pulsante:</em> Escuta ativa e funcionando no modo selecionado.</p>
+          <p>• <em>Vermelho:</em> Acesso ao microfone foi negado ou bloqueado no aparelho.</p>
+        </div>
+
+        <div class="tutorial-item">
+          <strong>⭐ Botão "Dar Feedback" e Mural</strong>
+          <p>Leva para a tela de avaliação onde você pode dar de 1 a 5 estrelas tocando nelas, escrever sua sugestão ou opinião e clicar em <em>Enviar Feedback</em>. Abaixo do envio, existe a <strong>Caixa de Feedbacks</strong> com as avaliações de todos os usuários.</p>
+        </div>
+
+        <div class="tutorial-item">
+          <strong>👏 Botão "5 Palmas" vs 🎙️ Botão "Voz ('Find My')"</strong>
+          <p>Definem o gatilho de busca permanente da sua conta:</p>
+          <p>• <em>5 Palmas:</em> Dispara o alarme ao bater cinco palmas nítidas dentro de uma janela de 4 segundos.</p>
+          <p>• <em>Voz:</em> Usa o microfone para reconhecer comandos parecidos com "Find My Cellphone" em qualquer sotaque.</p>
+        </div>
+
+        <div class="tutorial-item">
+          <strong>▶️ Botão "Ativar/Pausar Busca do Celular"</strong>
+          <p>Liga a detecção contínua. Mantenha essa opção ligada sempre que deixar o celular em algum cômodo ou quiser encontrá-lo com facilidade.</p>
+        </div>
+
+        <div class="tutorial-item">
+          <strong>🎚️ Controle Deslizante "Sensibilidade" (1 a 100)</strong>
+          <p>Ajusta a intensidade sonora necessária para considerar uma palma válida. O valor padrão é 60 (evita disparos falsos com barulho ambiente normal). Se o ambiente for ruidoso, aumente para 70–80.</p>
+        </div>
+
+        <div class="tutorial-item">
+          <strong>🎙️ Botão "Gravar Meu Próprio Alarme"</strong>
+          <p>Permite gravar sua própria voz (por exemplo: "Estou aqui!") pelo microfone para tocar no lugar do som de sirene.</p>
+        </div>
+
+        <div class="tutorial-item">
+          <strong>📂 Botão "Exportar/Importar Áudio do Aparelho"</strong>
+          <p>Permite selecionar e carregar qualquer música ou efeito sonoro em MP3/WAV já salvo na memória ou pasta de downloads do celular.</p>
+        </div>
+
+        <div class="tutorial-item">
+          <strong>🔔 Botão "Testar Alarme" & 🛑 "Parar Alarme"</strong>
+          <p>• <em>Testar Alarme:</em> Simula o disparo imediato com som alto, tela piscando e vibração para você conferir o volume.</p>
+          <p>• <em>Parar Alarme:</em> Desativa imediatamente o som, os flashes da tela e a vibração.</p>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- ESTADO GLOBAL ---
+    let currentUser = localStorage.getItem('fmp_user') || null;
+    let selectedMode = localStorage.getItem('fmp_mode') || 'claps';
+    let isListening = false;
+    let isAlarmRunning = false;
+    let selectedRating = 5;
+
+    let audioContext = null;
+    let analyserNode = null;
+    let microphoneStream = null;
+    let speechRecognizer = null;
+    let mediaRecorder = null;
+    let customAudioUrl = null;
+    let customAudioElement = new Audio();
+
+    let clapTimestamps = [];
+    let alarmInterval = null;
+    let currentSensitivity = 60;
+
+    // Feedbacks iniciais de exemplo
+    const initialFeedbacks = [
+      { name: "Marcos S.", rating: 5, comment: "Me salvou hoje de manhã! Achei o celular debaixo do sofá na hora.", date: "Ontem" },
+      { name: "Aline Costa", rating: 5, comment: "O modo de voz funciona super bem, o som é bem alto.", date: "Há 2 dias" },
+      { name: "Lucas P.", rating: 4, comment: "Muito prático. Ajustei a sensibilidade para 70 e ficou perfeito.", date: "Há 4 dias" }
+    ];
+
+    // --- NAVEGAÇÃO DE TELAS ---
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
+      document.getElementById(screenId).classList.add('active-screen');
+    }
+
+    // --- ATUALIZAÇÃO DO INDICADOR DE MICROFONE ---
+    function setMicStatus(status, message) {
+      const banner = document.getElementById('mic-status-banner');
+      const text = document.getElementById('mic-status-text');
+      banner.className = 'status-banner ' + status;
+      text.innerText = message;
+    }
+
+    // --- FLUXO DE AUTENTICAÇÃO ---
+    const emailInput = document.getElementById('auth-email-input');
+    const otpSection = document.getElementById('otp-section');
+    const btnSendCode = document.getElementById('btn-send-code');
+    const btnVerifyOtp = document.getElementById('btn-verify-otp');
+    const otpInput = document.getElementById('otp-input');
+    let generatedOtp = null;
+    let otpCountdown = null;
+
+    btnSendCode.addEventListener('click', () => {
+      const email = emailInput.value.trim();
+      if (!email || !email.includes('@')) {
+        alert('Digite um e-mail válido.');
+        return;
+      }
+      generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      otpSection.style.display = 'block';
+      btnSendCode.style.display = 'none';
+
+      alert(`[Simulação de E-mail]\nSeu código de verificação é: ${generatedOtp}`);
+
+      let timeLeft = 300;
+      clearInterval(otpCountdown);
+      otpCountdown = setInterval(() => {
+        timeLeft--;
+        document.getElementById('otp-timer').innerText = `Tempo restante: ${timeLeft}s`;
+        if (timeLeft <= 0) {
+          clearInterval(otpCountdown);
+          alert('O código expirou. Solicite novamente.');
+          otpSection.style.display = 'none';
+          btnSendCode.style.display = 'block';
+        }
+      }, 1000);
+    });
+
+    btnVerifyOtp.addEventListener('click', () => {
+      if (otpInput.value.trim() === generatedOtp) {
+        clearInterval(otpCountdown);
+        loginUser(emailInput.value.trim());
+      } else {
+        alert('Código incorreto!');
+      }
+    });
+
+    document.getElementById('btn-google-login').addEventListener('click', () => {
+      const mockGoogleE
