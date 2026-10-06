@@ -1,31 +1,14 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Find My Phone - Acha Celular</title>
-  <meta name="theme-color" content="#0f172a">
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-    body{background:#0f172a;color:#f8fafc;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px;gap:16px;transition:background .1s}
-    body.flashing{background:#fff!important}
-    header{text-align:center;max-width:420px} h1{font-size:1.8rem;font-weight:700;color:#38bdf8}
-    .app-description{font-size:.88rem;color:#94a3b8;line-height:1.4;margin-top:8px}
-    .instruction-card{background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);border-radius:12px;padding:12px 14px;font-size:.85rem;color:#e0f2fe;text-align:center;width:100%;max-width:380px}
-    .main-control{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%;max-width:380px;margin:8px 0}
-    .btn-toggle{width:160px;height:160px;border-radius:50%;border:4px solid #38bdf8;background:radial-gradient(circle,#1e293b 0%,#0f172a 100%);color:#38bdf8;font-size:1.15rem;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;box-shadow:0 0 25px rgba(56,189,248,.25);transition:all .3s}
-    .btn-toggle.active{border-color:#ef4444;color:#f87171;background:radial-gradient(circle,#450a0a 0%,#1e1b4b 100%);box-shadow:0 0 35px rgba(239,68,68,.4);animation:pulse 1.8s infinite}
-    @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.03)}100%{transform:scale(1)}}
-    .clap-counter-box{display:flex;align-items:center;gap:8px;font-size:1.1rem;font-weight:600;color:#f1f5f9;background:#1e293b;padding:8px 20px;border-radius:9999px;border:1px solid #334155}
-    .clap-dots{display:flex;gap:6px}.clap-dot{width:12px;height:12px;border-radius:50%;background:#475569;transition:all .2s}.clap-dot.filled{background:#38bdf8;transform:scale(1.2)}
-    .settings-card{width:100%;max-width:380px;background:#1e293b;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px;border:1px solid #334155}
-    .setting-row{display:flex;flex-direction:column;gap:6px}.setting-label{display:flex;justify-content:space-between;font-size:.85rem;color:#cbd5e1}
-    input[type=range]{width:100%;accent-color:#38bdf8;cursor:pointer}
-    .meter-container{background:#0f172a;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;border:1px solid #334155}
-    .meter-header{display:flex;justify-content:space-between;font-size:.8rem;color:#94a3b8}
-    .meter-bar-bg{width:100%;height:18px;background:#1e293b;border-radius:9px;overflow:hidden;position:relative}
-    .meter-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#22c55e,#eab308,#ef4444);transition:width .08s}
-    .meter-threshold-line{position:absolute;top:0;bottom:0;width:3px;background:#fff;box-shadow:0 0 4px #000}
-    .actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    button.btn-action{background:#334155;color:#f1f5f9;border:1px solid #475569;border-radius:8px;padding:10px 8px;font-size:.82rem;font-weight:500;cursor:pointer}
-    button.btn-stop{grid-column:span 2;background:#b91c1c;border:none;color:#fff;padding:12px;border-radius:
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Find My Phone</title><style>*{box-sizing:border-box;margin:0;padding:0;font-family:sans-serif}body{background:#0f172a;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px;gap:16px}body.flash{background:#fff}h1{color:#38bdf8;font-size:1.8rem}.card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:16px;width:100%;max-width:380px}.btn{width:150px;height:150px;border-radius:50%;border:4px solid #38bdf8;background:#1e293b;color:#38bdf8;font-weight:700;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-direction:column;margin:auto;cursor:pointer}.btn.active{border-color:#ef4444;color:#f87171;animation:pulse 1.5s infinite}@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.05)}100%{transform:scale(1)}}.dots{display:flex;gap:6px;justify-content:center;margin-top:8px}.dot{width:12px;height:12px;border-radius:50%;background:#475569}.dot.on{background:#38bdf8}input{width:100%}.meter{height:16px;background:#0f172a;border-radius:8px;overflow:hidden;margin-top:6px}.fill{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#ef4444);transition:.1s}.row{display:flex;justify-content:space-between;font-size:.9rem;color:#94a3b8}button.action{background:#334155;color:#fff;border:0;padding:10px;border-radius:8px;width:100%}.stop{display:none;background:#b91c1c;color:#fff;padding:12px;border:0;border-radius:8px;width:100%;font-weight:bold;margin-top:8px}</style></head><body>
+<h1>Find My Phone</h1><p style="color:#94a3b8;font-size:.9rem;text-align:center;max-width:380px">Ative e bata palma FORTE 5 vezes. Só palma forte ativa.</p>
+<button id="toggle" class="btn"><span>🎤</span><span id="txt">Ativar busca</span></button>
+<div class="card" style="text-align:center">Palmas: <b id="cnt">0</b>/5<div class="dots"><div class="dot" id="d0"></div><div class="dot" id="d1"></div><div class="dot" id="d2"></div><div class="dot" id="d3"></div><div class="dot" id="d4"></div></div></div>
+<div class="card"><div class="row"><span>Sensibilidade</span><b id="sVal">65</b></div><input id="sens" type="range" min="20" max="95" value="65"><small style="color:#64748b">65 = só palma forte. Aumenta se precisar gritar.</small><div class="row" style="margin-top:10px"><span>Nível</span><span id="lvl">0/100</span></div><div class="meter"><div id="fill" class="fill"></div></div><button id="test" class="action" style="margin-top:12px">Testar Microfone</button><button id="alarm" class="action" style="margin-top:8px">Testar Alarme</button><button id="stop" class="stop">PARAR ALARME</button></div>
+<script>
+let listening=false, alarming=false, testing=false, ctx, analyser, mic, stream, torch, count=0, last=0, start=null, cool=false, lock, fl, vib;
+const tgl=document.getElementById('toggle'), txt=document.getElementById('txt'), cnt=document.getElementById('cnt'), sens=document.getElementById('sens'), sVal=document.getElementById('sVal'), lvl=document.getElementById('lvl'), fill=document.getElementById('fill'), stopBtn=document.getElementById('stop');
+sens.oninput=e=>{sVal.textContent=e.target.value; localStorage.setItem('sens',e.target.value)}; sVal.textContent=localStorage.getItem('sens')||65; sens.value=sVal.textContent;
+function dots(){cnt.textContent=count; for(let i=0;i<5;i++)document.getElementById('d'+i).className='dot'+(i<count?' on':'');}
+async function audio(){if(!ctx)ctx=new (window.AudioContext||window.webkitAudioContext)(); if(ctx.state=='suspended')await ctx.resume(); if(!mic){let m=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}}); analyser=ctx.createAnalyser(); analyser.fftSize=512; ctx.createMediaStreamSource(m).connect(analyser); mic=m;}}
+async function startListen(){await audio(); listening=true; tgl.classList.add('active'); txt.textContent='Ouvindo...'; try{let s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); let tr=s.getVideoTracks()[0]; if(tr.getCapabilities().torch)torch=tr; stream=s;}catch{} if('wakeLock' in navigator)try{lock=await navigator.wakeLock.request('screen')}catch{} loop();}
+function stopListen(){listening=false; tgl.classList.remove('active'); txt.textContent='Ativar busca'; count=0; dots(); if(stream)stream.getTracks().forEach(t=>t.stop());}
+function loop(){if(!listening&&!testing)return; let b=new Uint8Array(analyser.frequencyBinCount); analyser.getByteFrequencyData(b); let sum=0; for(let v of b)sum+=v; let lev=Math.min(100,Math.round((sum/b.length)/1.8)); fill.style.width=lev+'%'; lvl.textContent=lev+'/100'; if(listening&&!alarming){let th=+
