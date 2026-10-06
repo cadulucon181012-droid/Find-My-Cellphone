@@ -43,6 +43,7 @@
       padding: 12px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600;
       cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
       width: 100%; transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
     button:active { transform: scale(0.98); }
     button.btn-primary { background: var(--primary); border-color: var(--accent); color: #ffffff; }
@@ -89,9 +90,9 @@
     }
     textarea { resize: vertical; min-height: 80px; }
 
-    .otp-inputs { display: flex; justify-content: center; gap: 12px; margin: 18px 0 12px; }
+    .otp-inputs { display: flex; justify-content: center; gap: 10px; margin: 18px 0 12px; }
     .otp-digit {
-      width: 56px; height: 64px; text-align: center; font-size: 1.8rem; font-weight: 700;
+      width: 54px; height: 60px; text-align: center; font-size: 1.8rem; font-weight: 700;
       color: var(--accent); background: #081426; border: 2px solid var(--border);
       border-radius: 12px; margin: 0; padding: 0;
     }
@@ -107,7 +108,8 @@
 
     /* Modal Google */
     .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 999;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85); z-index: 9999;
       display: none; align-items: center; justify-content: center; padding: 16px;
     }
     .modal-box {
@@ -127,14 +129,14 @@
 
     .error-msg { color: #f87171; font-size: 0.82rem; margin-top: 6px; display: none; text-align: center; }
 
-    .screen { display: none; }
-    .screen.active-screen { display: flex; flex-direction: column; gap: 14px; }
+    .screen { display: none !important; }
+    .screen.active-screen { display: flex !important; flex-direction: column; gap: 14px; }
   </style>
 </head>
 <body>
   <div class="app-container">
 
-    <!-- ==================== 1. TELA DE LOGIN ==================== -->
+    <!-- 1. TELA DE LOGIN -->
     <div id="screen-auth" class="card screen active-screen">
       <h1>Find My Phone</h1>
       <p style="text-align: center;">Localize seu aparelho tocando palmas ou chamando por voz.</p>
@@ -145,36 +147,32 @@
           type="email"
           id="auth-email-input"
           placeholder="exemplo@email.com"
-          value=""
           autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-          spellcheck="false"
         />
         <div id="auth-error" class="error-msg">Por favor, digite seu e-mail.</div>
       </div>
 
-      <button type="button" class="btn-primary" style="margin-top: 10px;" onclick="handleEmailLoginClick()">
+      <button type="button" class="btn-primary" style="margin-top: 10px;" id="btn-email-action">
         Continuar com E-mail
       </button>
 
       <div style="text-align: center; margin: 10px 0; color: var(--text-subtle); font-size: 0.8rem;">ou</div>
 
-      <button type="button" style="background: #ffffff; color: #0c192e; border-color: #ffffff;" onclick="openGoogleModal()">
+      <button type="button" id="btn-google-action" style="background: #ffffff; color: #0c192e; border-color: #ffffff;">
         <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c-.3-.7-.5-1.5-.5-2.4z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z"/></svg>
         Entrar com Google
       </button>
 
-      <button type="button" style="background: transparent; border: 1px dashed var(--border); color: var(--text-muted); font-size: 0.85rem; margin-top: 6px;" onclick="loginUser('Convidado')">
+      <button type="button" id="btn-guest-action" style="background: transparent; border: 1px dashed var(--border); color: var(--text-muted); font-size: 0.85rem; margin-top: 6px;">
         Entrar sem login (Acesso Rápido)
       </button>
     </div>
 
-    <!-- ==================== 2. TELA DO CÓDIGO (OTP - 300s) ==================== -->
+    <!-- 2. TELA DO CÓDIGO OTP -->
     <div id="screen-otp" class="card screen">
       <div style="display: flex; align-items: center; justify-content: space-between;">
         <h2>Código de Confirmação</h2>
-        <button type="button" style="width: auto; padding: 4px 10px; font-size: 0.8rem;" onclick="showScreen('screen-auth')">Trocar</button>
+        <button type="button" id="btn-back-to-auth" style="width: auto; padding: 4px 10px; font-size: 0.8rem;">Trocar</button>
       </div>
 
       <p style="margin-top: 6px;">
@@ -185,7 +183,7 @@
       <div style="background: rgba(56, 189, 248, 0.1); border: 1px dashed var(--accent); padding: 12px; border-radius: 10px; margin-top: 10px; text-align: center;">
         <span style="font-size: 0.8rem; color: var(--text-subtle);">Código recebido no seu e-mail:</span>
         <div id="otp-display-code" style="font-size: 1.8rem; font-weight: 700; color: var(--accent); letter-spacing: 6px; margin: 4px 0;">1234</div>
-        <button type="button" style="font-size: 0.78rem; padding: 6px 10px; background: rgba(56, 189, 248, 0.2); border-color: var(--accent); color: var(--accent);" onclick="autoFillOtp()">
+        <button type="button" id="btn-autofill-otp" style="font-size: 0.78rem; padding: 6px 10px; background: rgba(56, 189, 248, 0.2); border-color: var(--accent); color: var(--accent);">
           ⚡ Preencher Código Automaticamente
         </button>
       </div>
@@ -203,23 +201,23 @@
 
       <div id="otp-error" class="error-msg">Código incorreto! Digite os 4 dígitos certos.</div>
 
-      <button type="button" class="btn-primary" style="margin-top: 14px;" onclick="verifyOtpCode()">
+      <button type="button" class="btn-primary" style="margin-top: 14px;" id="btn-confirm-otp">
         Confirmar e Entrar
       </button>
 
-      <button type="button" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.82rem; margin-top: 8px;" onclick="resendOtp()">
+      <button type="button" id="btn-resend-action" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.82rem; margin-top: 8px;">
         Reenviar novo código
       </button>
     </div>
 
-    <!-- ==================== 3. TELA PRINCIPAL (APÓS LOGIN) ==================== -->
+    <!-- 3. TELA PRINCIPAL -->
     <div id="screen-main" class="screen">
       <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px;">
         <div>
           <span style="font-size: 0.75rem; color: var(--text-subtle); display: block;">Conectado como:</span>
           <span id="user-display" style="font-size: 0.85rem; color: var(--accent); font-weight: 600;"></span>
         </div>
-        <button type="button" style="width: auto; padding: 6px 12px; font-size: 0.8rem;" onclick="logout()">Sair</button>
+        <button type="button" id="btn-logout-action" style="width: auto; padding: 6px 12px; font-size: 0.8rem;">Sair</button>
       </div>
 
       <div id="mic-status-banner" class="status-banner idle">
@@ -231,17 +229,17 @@
         <h3>Modo de Disparo</h3>
         <p>Configuração permanente da sua conta:</p>
         <div class="mode-selector">
-          <div id="mode-claps" class="mode-btn selected" onclick="setDetectionMode('claps')">👏 5 Palmas</div>
-          <div id="mode-voice" class="mode-btn" onclick="setDetectionMode('voice')">🎙️ Voz ("Find My")</div>
+          <div id="mode-claps" class="mode-btn selected">👏 5 Palmas</div>
+          <div id="mode-voice" class="mode-btn">🎙️ Voz ("Find My")</div>
         </div>
-        <button type="button" id="btn-toggle-listen" class="btn-primary" onclick="toggleListening()">Ativar Busca do Celular</button>
+        <button type="button" id="btn-toggle-listen" class="btn-primary">Ativar Busca do Celular</button>
 
         <div style="margin-top: 14px;">
           <div class="control-row">
             <span>Sensibilidade do Som (1 a 100)</span>
             <span id="sens-value" style="font-weight: 600; color: var(--accent);">60</span>
           </div>
-          <input type="range" id="sensitivity-slider" min="10" max="100" step="10" value="60" oninput="changeSensitivity(this.value)" />
+          <input type="range" id="sensitivity-slider" min="10" max="100" step="10" value="60" />
         </div>
 
         <div style="margin-top: 12px;">
@@ -260,58 +258,58 @@
       <div class="card">
         <h3>Alarme Sonoro</h3>
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-          <button type="button" id="btn-record-audio" onclick="toggleRecording()">🎙️ Gravar Meu Próprio Alarme</button>
-          <button type="button" onclick="document.getElementById('file-input').click()">📂 Importar Áudio do Aparelho</button>
-          <input type="file" id="file-input" accept="audio/*" style="display: none;" onchange="handleAudioImport(event)" />
+          <button type="button" id="btn-record-audio">🎙️ Gravar Meu Próprio Alarme</button>
+          <button type="button" id="btn-open-file">📂 Importar Áudio do Aparelho</button>
+          <input type="file" id="file-input" accept="audio/*" style="display: none;" />
           <div id="custom-audio-info" style="font-size: 0.8rem; color: var(--accent); display: none;"></div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;">
-            <button type="button" class="btn-accent" onclick="triggerAlarm()">Testar Alarme</button>
-            <button type="button" class="btn-danger" onclick="stopAlarm()">Parar Alarme</button>
+            <button type="button" class="btn-accent" id="btn-test-alarm">Testar Alarme</button>
+            <button type="button" class="btn-danger" id="btn-stop-alarm">Parar Alarme</button>
           </div>
         </div>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-        <button type="button" onclick="showScreen('screen-tutorial')">📖 Como Usar</button>
-        <button type="button" style="border-color: var(--accent); color: var(--accent);" onclick="openFeedbackScreen()">⭐ Dar Feedback</button>
+        <button type="button" id="btn-nav-tutorial">📖 Como Usar</button>
+        <button type="button" id="btn-nav-feedback" style="border-color: var(--accent); color: var(--accent);">⭐ Dar Feedback</button>
       </div>
     </div>
 
-    <!-- ==================== 4. TELA DE FEEDBACK ==================== -->
+    <!-- 4. TELA DE FEEDBACK -->
     <div id="screen-feedback" class="card screen">
       <div style="display: flex; align-items: center; justify-content: space-between;">
         <h2>Avaliação e Feedback</h2>
-        <button type="button" style="width: auto; padding: 4px 10px; font-size: 0.8rem;" onclick="showScreen('screen-main')">Voltar</button>
+        <button type="button" id="btn-back-feedback" style="width: auto; padding: 4px 10px; font-size: 0.8rem;">Voltar</button>
       </div>
       <p>Dê uma nota e deixe sua mensagem:</p>
 
       <div class="star-rating" id="star-rating">
-        <span class="star active" onclick="setStarRating(1)">★</span>
-        <span class="star active" onclick="setStarRating(2)">★</span>
-        <span class="star active" onclick="setStarRating(3)">★</span>
-        <span class="star active" onclick="setStarRating(4)">★</span>
-        <span class="star active" onclick="setStarRating(5)">★</span>
+        <span class="star active" data-val="1">★</span>
+        <span class="star active" data-val="2">★</span>
+        <span class="star active" data-val="3">★</span>
+        <span class="star active" data-val="4">★</span>
+        <span class="star active" data-val="5">★</span>
       </div>
       <div style="text-align: center; font-size: 0.85rem; color: var(--accent);" id="rating-label">5 estrelas</div>
 
       <textarea id="feedback-comment" placeholder="Escreva aqui sua experiência ou sugestão..."></textarea>
-      <button type="button" class="btn-primary" style="margin-top: 10px;" onclick="submitFeedback()">Enviar Feedback</button>
+      <button type="button" class="btn-primary" style="margin-top: 10px;" id="btn-send-feedback">Enviar Feedback</button>
 
       <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;" />
       <h3>Mural de Feedbacks da Comunidade</h3>
       <div id="feedback-list" style="margin-top: 10px; max-height: 220px; overflow-y: auto;"></div>
     </div>
 
-    <!-- ==================== 5. TELA DE TUTORIAL ==================== -->
+    <!-- 5. TELA DE TUTORIAL -->
     <div id="screen-tutorial" class="card screen">
       <div style="display: flex; align-items: center; justify-content: space-between;">
         <h2>Como se usa essa plataforma</h2>
-        <button type="button" style="width: auto; padding: 4px 10px; font-size: 0.8rem;" onclick="showScreen('screen-main')">Voltar</button>
+        <button type="button" id="btn-back-tutorial" style="width: auto; padding: 4px 10px; font-size: 0.8rem;">Voltar</button>
       </div>
       <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px; font-size: 0.88rem; max-height: 480px; overflow-y: auto;">
         <div class="tutorial-item">
           <strong>🔐 Login com Código ou Google</strong>
-          <p>• <em>E-mail:</em> digite seu e-mail para receber um código de 4 dígitos e confirme em até 300 segundos.<br/>
+          <p>• <em>E-mail:</em> digite seu e-mail para receber um código de 4 dígitos e confirme em 300 segundos.<br/>
           • <em>Google:</em> escolha uma conta com um clique e entre na hora.</p>
         </div>
         <div class="tutorial-item">
@@ -328,11 +326,11 @@
         </div>
         <div class="tutorial-item">
           <strong>▶️ Ativar Busca</strong>
-          <p>Ativa o monitoramento contínuo para você poder achar o celular a qualquer hora.</p>
+          <p>Ativa o monitoramento contínuo para achar o celular a qualquer momento.</p>
         </div>
         <div class="tutorial-item">
           <strong>🎚️ Sensibilidade</strong>
-          <p>Padrão 60. Aumente para 70–80 se o local estiver barulhento.</p>
+          <p>Padrão 60. Aumente para 70–80 se o ambiente estiver barulhento.</p>
         </div>
         <div class="tutorial-item">
           <strong>🎙️ Gravar e 📂 Importar Áudio</strong>
@@ -345,13 +343,13 @@
       </div>
     </div>
 
-    <!-- ==================== MODAL DE CONTAS GOOGLE ==================== -->
-    <div id="google-modal" class="modal-overlay" onclick="closeGoogleModal(event)">
-      <div class="modal-box" onclick="event.stopPropagation()">
+    <!-- MODAL GOOGLE -->
+    <div id="google-modal" class="modal-overlay">
+      <div class="modal-box">
         <h2 style="font-size: 1.1rem; color: #f0f9ff;">Escolha uma conta Google</h2>
         <p style="font-size: 0.82rem; color: var(--text-subtle); margin-bottom: 12px;">Toque na conta para entrar na hora:</p>
         
-        <div class="account-row" onclick="chooseGoogleAccount('Minha Conta Google')">
+        <div class="account-row" id="google-opt-1">
           <div class="account-avatar">G</div>
           <div>
             <div style="font-size: 0.9rem; font-weight:600;">Minha Conta Google</div>
@@ -359,7 +357,26 @@
           </div>
         </div>
 
-        <div class="account-row" onclick="chooseGoogleAccount('Conta Pessoal/Estudos')">
+        <div class="account-row" id="google-opt-2">
           <div class="account-avatar" style="background:#0284c7; color:#fff;">P</div>
           <div>
-            <di
+            <div style="font-size: 0.9rem; font-weight:600;">Conta Pessoal / Estudos</div>
+            <div class="account-email">Entrar com conta secundária</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 12px;">
+          <input type="email" id="custom-google-input" placeholder="Ou digite outro Gmail..." autocomplete="off" style="margin:0; font-size:0.85rem; padding:10px;" />
+          <button type="button" class="btn-primary" style="margin-top: 6px;" id="btn-custom-google">Entrar com este Gmail</button>
+        </div>
+
+        <button type="button" style="margin-top: 12px; background: transparent; border: none; color: var(--accent);" id="btn-close-google">Cancelar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. NAVEGAÇÃO E LOGIN (EXECUTADO IMEDIATAMENTE)
+    // ==========================
