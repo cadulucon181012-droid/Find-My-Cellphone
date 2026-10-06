@@ -379,4 +379,537 @@
   <script>
     // ==========================================
     // 1. NAVEGAÇÃO E LOGIN (EXECUTADO IMEDIATAMENTE)
-    // ==========================
+    // ==========================    // ==========================================
+    // 2. MODOS E SENSIBILIDADE
+    // ==========================================
+    var selectedMode = 'claps';
+    var currentSensitivity = 60;
+    var modeClaps = document.getElementById('mode-claps');
+    var modeVoice = document.getElementById('mode-voice');
+    var clapsCountBox = document.getElementById('claps-counter-box');
+
+    modeClaps.addEventListener('click', function() {
+      selectedMode = 'claps';
+      modeClaps.classList.add('selected');
+      modeVoice.classList.remove('selected');
+      clapsCountBox.style.display = 'block';
+      if (isListening) restartListening();
+    });
+
+    modeVoice.addEventListener('click', function() {
+      selectedMode = 'voice';
+      modeVoice.classList.add('selected');
+      modeClaps.classList.remove('selected');
+      clapsCountBox.style.display = 'none';
+      if (isListening) restartListening();
+    });
+
+    document.getElementById('sensitivity-slider').addEventListener('input', function(e) {
+      currentSensitivity = parseInt(e.target.value, 10);
+      document.getElementById('sens-value').innerText = currentSensitivity;
+    });
+
+    // ==========================================
+    // 3. MICROFONE & ESCUTA
+    // ==========================================
+    var isListening = false;
+    var audioContext = null;
+    var analyserNode = null;
+    var microphoneStream = null;
+    var speechRecognizer = null;
+    var clapTimestamps = [];
+
+    document.getElementById('btn-toggle-listen').addEventListener('click', function() {
+      if (isListening) {
+        stopListening();
+      } else {
+        startListening();
+      }
+    });
+
+    function restartListening() {
+      stopListening();
+      setTimeout(startListening, 300);
+    }
+
+    async function startListening() {
+      setMicStatus('waiting', 'Aguardando permissão de microfone...');
+      try {
+        microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 512;
+        audioContext.createMediaStreamSource(microphoneStream).connect(analyserNode);
+
+        isListening = true;
+        var btn = document.getElementById('btn-toggle-listen');
+        btn.innerText = 'Pausar Busca';
+        btn.className = 'btn-danger';
+
+        if (selectedMode === 'claps') {
+          setMicStatus('active', 'Escuta ativa: Modo 5 Palmas');
+          monitorClaps();
+        } else {
+          setMicStatus('active', 'Escuta ativa: Modo Voz ("Find My")');
+          startVoiceRecognition();
+        }
+      } catch (err) {
+        setMicStatus('blocked', 'Microfone bloqueado ou sem permissão.');
+        isListening = false;
+        var btn = document.getElementById('btn-toggle-listen');
+        btn.innerText = 'Ativar Busca do Celular';
+        btn.className = 'btn-primary';
+      }
+    }
+
+    function stopListening() {
+      isListening = false;
+      if (microphoneStream) {
+        microphoneStream.getTracks().forEach(function(t) { t.stop(); });
+        microphoneStream = null;
+      }
+      if (audioContext) {
+        try { audioContext.close(); } catch(e){}
+        audioContext = null;
+      }
+      if (speechRecognizer) {
+        try { speechRecognizer.stop(); } catch(e){}
+        speechRecognizer = null;
+      }
+      var btn = document.getElementById('btn-toggle-listen');
+      btn.innerText = 'Ativar Busca do Celular';
+      btn.className = 'btn-primary';
+      setMicStatus('idle', 'Escuta inativa. Clique em "Ativar Busca".');
+      document.getElementById('volume-meter').style.width = '0%';
+      document.getElementById('current-volume').innerText = '0%';
+    }
+
+    function setMicStatus(cls, msg) {
+      var banner = document.getElementById('mic-status-banner');
+      var txt = document.getElementById('mic-status-text');
+      if (banner) banner.className = 'status-banner ' + cls;
+      if (txt) txt.innerText = msg;
+    }
+
+    function monitorClaps() {
+      if (!isListening || selectedMode !== 'claps') return;
+      var dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+      analyserNode.getByteTimeDomainData(dataArray);
+
+      var sum = 0;
+      for (var i = 0; i < dataArray.length; i++) {
+        var n = (dataArray[i] - 128) / 128;
+        sum += n * n;
+      }
+      var rms = Math.sqrt(sum / dataArray.length);
+      var volumeScore = Math.min(100, Math.round(rms * 280));
+
+      document.getElementById('volume-meter').style.width = volumeScore + '%';
+      document.getElementById('current-volume').innerText = volumeScore + '%';
+
+      if (volumeScore >= currentSensitivity) {
+        var now = Date.now();
+        if (clapTimestamps.length === 0 || (now - clapTimestamps[clapTimestamps.length - 1] > 250)) {
+          clapTimestamps.push(now);
+          clapTimestamps = clapTimestamps.filter(function(t) { return now - t <= 4000; });
+          document.getElementById('claps-count').innerText = clapTimestamps.length;
+
+          if (clapTimestamps.length >= 5) {
+            clapTimestamps = [];
+            document.getElementById('claps-count').innerText = '0';
+            triggerAlarm();
+          }
+        }
+      }
+      requestAnimationFrame(monitorClaps);
+    }
+
+    function startVoiceRecognition() {
+      var Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Speech) {
+        setMicStatus('blocked', 'Reconhecimento de voz não suportado neste navegador.');
+        return;
+      }
+      speechRecognizer = new Speech();
+      speechRecognizer.continuous = true;
+      speechRecognizer.interimResults = true;
+      speechRecognizer.lang = 'pt-BR';
+      speechRecognizer.onresult = function(event) {
+        for (var i = event.resultIndex; i < event.results.length; ++i) {
+          var phrase = event.results[i][0].transcript.toLowerCase();
+          if (phrase.includes('find my') || phrase.includes('celular') || phrase.includes('cellphone') || phrase.includes('cadê')) {
+            triggerAlarm();
+          }
+        }
+      };
+      speechRecognizer.onerror = function() {
+        if (isListening) { try { speechRecognizer.start(); } catch(e){} }
+      };
+      speechRecognizer.onend = function() {
+        if (isListening && selectedMode === 'voice') { try { speechRecognizer.start(); } catch(e){} }
+      };
+      try { speechRecognizer.start(); } catch(e){}
+    }
+
+    // ==========================================
+    // 4. ALARME & SOM (INICIALIZADO APENAS AO TOCAR)
+    // ==========================================
+    var isAlarmRunning = false;
+    var alarmInterval = null;
+    var sirenCtx = null;
+    var sirenOsc1 = null;
+    var sirenOsc2 = null;
+    var customAudioUrl = null;
+    var customAudioEl = null;
+
+    document.getElementById('btn-test-alarm').addEventListener('click', triggerAlarm);
+    document.getElementById('btn-stop-alarm').addEventListener('click', stopAlarm);
+
+    function triggerAlarm() {
+      if (isAlarmRunning) return;
+      isAlarmRunning = true;
+
+      if (customAudioUrl) {
+        if (!customAudioEl) customAudioEl = new Audio();
+        customAudioEl.src = customAudioUrl;
+        customAudioEl.loop = true;
+        customAudioEl.volume = 1.0;
+        customAudioEl.play();
+      } else {
+        startSiren();
+      }
+
+      var toggle = false;
+      alarmInterval = setInterval(function() {
+        toggle = !toggle;
+        document.body.className = toggle ? 'alarm-flash-1' : 'alarm-flash-2';
+        if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100]);
+      }, 350);
+    }
+
+    function stopAlarm() {
+      isAlarmRunning = false;
+      clearInterval(alarmInterval);
+      document.body.className = '';
+      if (customAudioEl) {
+        customAudioEl.pause();
+        customAudioEl.currentTime = 0;
+      }
+      stopSiren();
+    }
+
+    function startSiren() {
+      sirenCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var gain = sirenCtx.createGain();
+      gain.gain.setValueAtTime(1.0, sirenCtx.currentTime);
+      gain.connect(sirenCtx.destination);
+
+      sirenOsc1 = sirenCtx.createOscillator();
+      sirenOsc2 = sirenCtx.createOscillator();
+      sirenOsc1.type = 'sawtooth';
+      sirenOsc2.type = 'square';
+      sirenOsc1.frequency.value = 800;
+      sirenOsc2.frequency.value = 950;
+      sirenOsc1.connect(gain);
+      sirenOsc2.connect(gain);
+      sirenOsc1.start();
+      sirenOsc2.start();
+    }
+
+    function stopSiren() {
+      if (sirenOsc1) { try { sirenOsc1.stop(); } catch(e){} sirenOsc1 = null; }
+      if (sirenOsc2) { try { sirenOsc2.stop(); } catch(e){} sirenOsc2 = null; }
+      if (sirenCtx) { try { sirenCtx.close(); } catch(e){} sirenCtx = null; }
+    }
+
+    // ==========================================
+    // 5. GRAVAÇÃO E IMPORTAÇÃO
+    // ==========================================
+    var isRecording = false;
+    var mediaRecorder = null;
+    var recordChunks = [];
+
+    document.getElementById('btn-record-audio').addEventListener('click', async function() {
+      var btn = document.getElementById('btn-record-audio');
+      if (!isRecording) {
+        try {
+          var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          recordChunks = [];
+          mediaRecorder.ondataavailable = function(e) { recordChunks.push(e.data); };
+          mediaRecorder.onstop = function() {
+            var blob = new Blob(recordChunks, { type: 'audio/webm' });
+            customAudioUrl = URL.createObjectURL(blob);
+            var info = document.getElementById('custom-audio-info');
+            info.style.display = 'block';
+            info.innerText = '✓ Áudio gravado pronto para o alarme';
+          };
+          mediaRecorder.start();
+          isRecording = true;
+          btn.innerText = '⏹️ Parar e Salvar Gravação';
+        } catch(e) {
+          alert('Permissão de gravação negada.');
+        }
+      } else {
+        if (mediaRecorder) mediaRecorder.stop();
+        isRecording = false;
+        btn.innerText = '🎙️ Gravar Meu Próprio Alarme';
+      }
+    });
+
+    document.getElementById('btn-open-file').addEventListener('click', function() {
+      document.getElementById('file-input').click();
+    });
+
+    document.getElementById('file-input').addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (file) {
+        customAudioUrl = URL.createObjectURL(file);
+        var info = document.getElementById('custom-audio-info');
+        info.style.display = 'block';
+        info.innerText = '✓ Áudio carregado: ' + file.name;
+      }
+    });
+
+    // ==========================================
+    // 6. FEEDBACK & TUTORIAL
+    // ==========================================
+    var selectedRating = 5;
+    var initialFeedbacks = [
+      { name: "Marcos S.", rating: 5, comment: "Me salvou hoje de manhã! Achei o celular debaixo do sofá na hora.", date: "Ontem" },
+      { name: "Aline Costa", rating: 5, comment: "O modo de voz funciona super bem, o som é bem alto.", date: "Há 2 dias" },
+      { name: "Lucas P.", rating: 4, comment: "Muito prático. Ajustei a sensibilidade para 70 e ficou perfeito.", date: "Há 4 dias" }
+    ];
+
+    document.getElementById('btn-nav-feedback').addEventListener('click', function() {
+      loadFeedbacks();
+      showScreen('screen-feedback');
+    });
+    document.getElementById('btn-back-feedback').addEventListener('click', function() {
+      showScreen('screen-main');
+    });
+
+    document.getElementById('btn-nav-tutorial').addEventListener('click', function() {
+      showScreen('screen-tutorial');
+    });
+    document.getElementById('btn-back-tutorial').addEventListener('click', function() {
+      showScreen('screen-main');
+    });
+
+    document.querySelectorAll('#star-rating .star').forEach(function(star) {
+      star.addEventListener('click', function() {
+        var val = parseInt(star.getAttribute('data-val'), 10);
+        selectedRating = val;
+        document.querySelectorAll('#star-rating .star').forEach(function(s, idx) {
+          s.classList.toggle('active', idx < val);
+        });
+        document.getElementById('rating-label').innerText = val + ' estrela' + (val > 1 ? 's' : '');
+      });
+    });
+
+    function loadFeedbacks() {
+      var list = document.getElementById('feedback-list');
+      if (!list) return;
+      list.innerHTML = '';
+      initialFeedbacks.forEach(function(item) {
+        var div = document.createElement('div');
+        div.className = 'feedback-item';
+        div.innerHTML =
+          '<div class="feedback-header"><strong>' + item.name + '</strong><span>' +
+          '★'.repeat(item.rating) + '☆'.repeat(5 - item.rating) + '</span></div>' +
+          '<p style="color:var(--text);font-size:0.85rem;">' + item.comment + '</p>' +
+          '<span style="font-size:0.75rem;color:var(--text-subtle);">' + item.date + '</span>';
+        list.appendChild(div);
+      });
+    }
+
+    document.getElementById('btn-send-feedback').addEventListener('click', function() {
+      var val = document.getElementById('feedback-comment').value.trim();
+      if (!val) {
+        alert('Digite uma mensagem antes de enviar.');
+        return;
+      }
+      initialFeedbacks.unshift({
+        name: currentUser || 'Usuário',
+        rating: selectedRating,
+        comment: val,
+        date: 'Agora'
+      });
+      document.getElementById('feedback-comment').value = '';
+      loadFeedbacks();
+      alert('Feedback enviado com sucesso!');
+    });
+  </script>
+</body>
+</html>
+
+    var currentUser = null;
+    var pendingEmail = '';
+    var expectedOtp = '1234';
+    var otpTimerInterval = null;
+    var otpRemainingSeconds = 300;
+
+    function showScreen(screenId) {
+      var all = document.querySelectorAll('.screen');
+      for (var i = 0; i < all.length; i++) {
+        all[i].classList.remove('active-screen');
+      }
+      var target = document.getElementById(screenId);
+      if (target) {
+        target.classList.add('active-screen');
+        window.scrollTo(0, 0);
+      }
+    }
+
+    function loginUser(userName) {
+      currentUser = userName || 'Usuário';
+      var disp = document.getElementById('user-display');
+      if (disp) disp.innerText = currentUser;
+      showScreen('screen-main');
+      loadFeedbacks();
+    }
+
+    // BOTÃO CONTINUAR COM E-MAIL
+    document.getElementById('btn-email-action').addEventListener('click', function() {
+      var input = document.getElementById('auth-email-input');
+      var email = input ? input.value.trim() : '';
+      if (!email) {
+        email = 'usuario@exemplo.com';
+      }
+      pendingEmail = email;
+      document.getElementById('otp-target-email').innerText = email;
+
+      expectedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      document.getElementById('otp-display-code').innerText = expectedOtp;
+
+      for (var i = 1; i <= 4; i++) {
+        var el = document.getElementById('otp-' + i);
+        if (el) el.value = '';
+      }
+      document.getElementById('otp-error').style.display = 'none';
+
+      startOtpTimer(300);
+      showScreen('screen-otp');
+      setTimeout(function() {
+        var f = document.getElementById('otp-1');
+        if (f) f.focus();
+      }, 200);
+    });
+
+    // BOTÃO GOOGLE
+    document.getElementById('btn-google-action').addEventListener('click', function() {
+      document.getElementById('google-modal').style.display = 'flex';
+    });
+
+    document.getElementById('btn-close-google').addEventListener('click', function() {
+      document.getElementById('google-modal').style.display = 'none';
+    });
+
+    document.getElementById('google-opt-1').addEventListener('click', function() {
+      document.getElementById('google-modal').style.display = 'none';
+      loginUser('Minha Conta Google');
+    });
+
+    document.getElementById('google-opt-2').addEventListener('click', function() {
+      document.getElementById('google-modal').style.display = 'none';
+      loginUser('Conta Pessoal/Estudos');
+    });
+
+    document.getElementById('btn-custom-google').addEventListener('click', function() {
+      var val = document.getElementById('custom-google-input').value.trim() || 'usuario@gmail.com';
+      document.getElementById('google-modal').style.display = 'none';
+      loginUser(val);
+    });
+
+    // BOTÃO ACESSO RÁPIDO
+    document.getElementById('btn-guest-action').addEventListener('click', function() {
+      loginUser('Convidado');
+    });
+
+    // BOTÃO VOLTAR DO OTP
+    document.getElementById('btn-back-to-auth').addEventListener('click', function() {
+      clearInterval(otpTimerInterval);
+      showScreen('screen-auth');
+    });
+
+    // PREENCHIMENTO RÁPIDO DO OTP
+    document.getElementById('btn-autofill-otp').addEventListener('click', function() {
+      for (var i = 1; i <= 4; i++) {
+        var el = document.getElementById('otp-' + i);
+        if (el) el.value = expectedOtp[i - 1];
+      }
+      verifyOtp();
+    });
+
+    document.getElementById('btn-confirm-otp').addEventListener('click', verifyOtp);
+    document.getElementById('btn-resend-action').addEventListener('click', function() {
+      document.getElementById('btn-email-action').click();
+    });
+
+    function verifyOtp() {
+      var code = '';
+      for (var i = 1; i <= 4; i++) {
+        var el = document.getElementById('otp-' + i);
+        if (el) code += el.value.trim();
+      }
+      if (code === expectedOtp) {
+        clearInterval(otpTimerInterval);
+        loginUser(pendingEmail);
+      } else {
+        var err = document.getElementById('otp-error');
+        if (err) {
+          err.innerText = 'Código incorreto! Confira os 4 dígitos.';
+          err.style.display = 'block';
+        }
+      }
+    }
+
+    function startOtpTimer(sec) {
+      clearInterval(otpTimerInterval);
+      otpRemainingSeconds = sec;
+      var lbl = document.getElementById('otp-seconds');
+      if (lbl) lbl.innerText = otpRemainingSeconds;
+
+      otpTimerInterval = setInterval(function() {
+        otpRemainingSeconds--;
+        if (lbl) lbl.innerText = otpRemainingSeconds;
+        if (otpRemainingSeconds <= 0) {
+          clearInterval(otpTimerInterval);
+          var err = document.getElementById('otp-error');
+          if (err) {
+            err.innerText = 'Tempo expirado. Clique em reenviar novo código.';
+            err.style.display = 'block';
+          }
+        }
+      }, 1000);
+    }
+
+    // Configuração dos 4 campos OTP
+    [1, 2, 3, 4].forEach(function(num) {
+      var input = document.getElementById('otp-' + num);
+      if (input) {
+        input.addEventListener('input', function(e) {
+          var val = e.target.value.replace(/\D/g, '');
+          e.target.value = val ? val[val.length - 1] : '';
+          if (e.target.value && num < 4) {
+            var next = document.getElementById('otp-' + (num + 1));
+            if (next) next.focus();
+          }
+          var allFilled = true;
+          for (var j = 1; j <= 4; j++) {
+            if (!document.getElementById('otp-' + j).value) allFilled = false;
+          }
+          if (allFilled) verifyOtp();
+        });
+      }
+    });
+
+    // LOGOUT
+    document.getElementById('btn-logout-action').addEventListener('click', function() {
+      stopListening();
+      stopAlarm();
+      currentUser = null;
+      var input = document.getElementById('auth-email-input');
+      if (input) input.value = '';
+      showScreen('screen-auth');
+    });
