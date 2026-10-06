@@ -1,915 +1,457 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Find My Phone</title>
-  <style>
-    :root {
-      --bg: #070f1e;
-      --card-bg: #0c192e;
-      --border: #1e3a5f;
-      --primary: #0284c7;
-      --primary-hover: #38bdf8;
-      --danger: #ef4444;
-      --warning: #f59e0b;
-      --text: #f0f9ff;
-      --text-muted: #7dd3fc;
-      --text-subtle: #94a3b8;
-      --accent: #38bdf8;
-      --accent-glow: rgba(56, 189, 248, 0.25);
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body {
-      background: var(--bg); color: var(--text); min-height: 100vh;
-      display: flex; flex-direction: column; align-items: center; padding: 16px;
-      transition: background-color 0.1s;
-    }
-    body.alarm-flash-1 { background: #38bdf8 !important; color: #000 !important; }
-    body.alarm-flash-2 { background: #ffffff !important; color: #000 !important; }
-    .app-container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 14px; }
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
-      box-shadow: 0 4px 20px rgba(2, 132, 199, 0.08);
-    }
-    h1, h2, h3 { margin-bottom: 8px; font-weight: 600; color: #e0f2fe; }
-    h1 { font-size: 1.6rem; text-align: center; color: var(--accent); }
-    p { font-size: 0.9rem; color: var(--text-subtle); line-height: 1.4; }
-    button {
-      background: #112240; color: var(--text); border: 1px solid var(--border);
-      padding: 12px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600;
-      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%; transition: all 0.2s; -webkit-tap-highlight-color: transparent;
-      user-select: none;
-    }
-    button:active { transform: scale(0.98); }
-    button.btn-primary { background: var(--primary); border-color: var(--accent); color: #ffffff; }
-    button.btn-primary:hover { background: #0369a1; }
-    button.btn-danger { background: var(--danger); border-color: #f87171; }
-    button.btn-accent { background: rgba(56, 189, 248, 0.15); border-color: var(--accent); color: var(--accent); }
-
-    .status-banner {
-      display: flex; align-items: center; gap: 10px; padding: 12px;
-      border-radius: 10px; font-size: 0.9rem; font-weight: 500;
-      border: 1px solid var(--border); background: #081426;
-    }
-    .status-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--text-subtle); flex-shrink: 0; }
-    .status-banner.waiting { border-color: var(--warning); background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .status-banner.waiting .status-dot { background: var(--warning); animation: pulse 1.2s infinite; }
-    .status-banner.active { border-color: var(--accent); background: rgba(56, 189, 248, 0.15); color: var(--accent); }
-    .status-banner.active .status-dot { background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: pulse 1.5s infinite; }
-    .status-banner.blocked { border-color: var(--danger); background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    .status-banner.blocked .status-dot { background: var(--danger); }
-    @keyframes pulse { 0%,100% { opacity: .4; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.15); } }
-
-    .mode-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
-    .mode-btn {
-      padding: 10px; border-radius: 10px; font-size: 0.85rem; border: 1px solid var(--border);
-      background: #081426; text-align: center; cursor: pointer; color: var(--text-subtle);
-    }
-    .mode-btn.selected { border-color: var(--accent); background: var(--accent-glow); color: var(--accent); font-weight: 600; }
-
-    .control-row { display: flex; justify-content: space-between; margin: 12px 0 6px; font-size: 0.85rem; color: var(--text-muted); }
-    input[type="range"] { width: 100%; accent-color: var(--accent); }
-    .meter-container { height: 10px; background: #081426; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-top: 8px; }
-    .meter-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #0284c7, #38bdf8); transition: width 0.05s; }
-
-    .star-rating { display: flex; gap: 10px; font-size: 2rem; cursor: pointer; justify-content: center; margin: 14px 0; }
-    .star { color: #1e3a5f; transition: color 0.15s; }
-    .star.active { color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.5); }
-
-    textarea, input[type="text"], input[type="email"] {
-      width: 100%; background: #081426; border: 1px solid var(--border); border-radius: 10px;
-      padding: 12px; color: var(--text); font-size: 0.95rem; margin-top: 6px;
-    }
-    textarea:focus, input:focus {
-      outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow);
-    }
-    textarea { resize: vertical; min-height: 80px; }
-
-    .otp-inputs { display: flex; justify-content: center; gap: 10px; margin: 18px 0 12px; }
-    .otp-digit {
-      width: 54px; height: 60px; text-align: center; font-size: 1.8rem; font-weight: 700;
-      color: var(--accent); background: #081426; border: 2px solid var(--border);
-      border-radius: 12px; margin: 0; padding: 0;
-    }
-    .otp-digit:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); outline: none; }
-
-    .feedback-item { border-bottom: 1px solid var(--border); padding: 10px 0; }
-    .feedback-item:last-child { border-bottom: none; }
-    .feedback-header { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
-
-    .tutorial-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
-    .tutorial-item:last-child { border-bottom: none; }
-    .tutorial-item strong { color: var(--accent); display: block; margin-bottom: 4px; }
-
-    /* Modal Google */
-    .modal-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.85); z-index: 9999;
-      display: none; align-items: center; justify-content: center; padding: 16px;
-    }
-    .modal-box {
-      background: #0c192e; border-radius: 14px; padding: 20px; width: 100%; max-width: 360px;
-      color: #f0f9ff; border: 1px solid var(--border);
-    }
-    .account-row {
-      display: flex; align-items: center; gap: 12px; padding: 12px 10px; border-radius: 8px;
-      cursor: pointer; margin-bottom: 6px; background: #081426; border: 1px solid var(--border);
-    }
-    .account-row:active { background: #112240; }
-    .account-avatar {
-      width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: #070f1e;
-      display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; font-size: 1.1rem;
-    }
-    .account-email { font-size: 0.82rem; color: var(--text-subtle); }
-
-    .error-msg { color: #f87171; font-size: 0.82rem; margin-top: 6px; display: none; text-align: center; }
-
-    .screen { display: none !important; }
-    .screen.active-screen { display: flex !important; flex-direction: column; gap: 14px; }
-  </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Find My Phone</title>
+<style>
+:root{--bg:#070f1e;--card:#0c192e;--b:#1e3a5f;--p:#0284c7;--t:#f0f9ff;--tm:#7dd3fc;--ts:#94a3b8;--a:#38bdf8;--ag:rgba(56,189,248,.25)}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}
+body{background:var(--bg);color:var(--t);min-height:100vh;display:flex;justify-content:center;padding:16px}
+body.f1{background:#38bdf8!important;color:#000!important}
+body.f2{background:#fff!important;color:#000!important}
+.wrap{width:100%;max-width:480px;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--card);border:1px solid var(--b);border-radius:14px;padding:16px}
+h1,h2,h3{margin-bottom:8px;font-weight:600}h1{font-size:1.6rem;text-align:center;color:var(--a)}
+p{font-size:.9rem;color:var(--ts);line-height:1.4}
+button{background:#112240;color:var(--t);border:1px solid var(--b);padding:12px;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;width:100%;transition:.2s}
+button:active{transform:scale(.98)}
+.bp{background:var(--p);border-color:var(--a);color:#fff}.bd{background:#ef4444;border-color:#f87171}.ba{background:rgba(56,189,248,.15);border-color:var(--a);color:var(--a)}
+.status{display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;font-size:.9rem;border:1px solid var(--b);background:#081426}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--ts);flex-shrink:0}
+.waiting{border-color:#f59e0b;background:rgba(245,158,11,.15);color:#fbbf24}.waiting .dot{background:#f59e0b;animation:pls 1.2s infinite}
+.active{border-color:var(--a);background:rgba(56,189,248,.15);color:var(--a)}.active .dot{background:var(--a);animation:pls 1.5s infinite}
+.blocked{border-color:#ef4444;background:rgba(239,68,68,.15);color:#f87171}.blocked .dot{background:#ef4444}
+@keyframes pls{0%,100%{opacity:.4;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.mbtn{padding:10px;border-radius:10px;font-size:.85rem;border:1px solid var(--b);background:#081426;text-align:center;cursor:pointer;color:var(--ts)}
+.mbtn.sel{border-color:var(--a);background:var(--ag);color:var(--a);font-weight:600}
+.row{display:flex;justify-content:space-between;margin:12px 0 6px;font-size:.85rem;color:var(--tm)}
+input[type=range]{width:100%;accent-color:var(--a)}
+.meter{height:10px;background:#081426;border:1px solid var(--b);border-radius:6px;overflow:hidden;margin-top:8px}
+.fill{height:100%;width:0%;background:linear-gradient(90deg,#0284c7,#38bdf8);transition:width .05s}
+.stars{display:flex;gap:10px;font-size:2rem;cursor:pointer;justify-content:center;margin:14px 0}
+.star{color:#1e3a5f}.star.act{color:#38bdf8;text-shadow:0 0 8px rgba(56,189,248,.5)}
+textarea,input[type=text],input[type=email]{width:100%;background:#081426;border:1px solid var(--b);border-radius:10px;padding:12px;color:var(--t);font-size:.95rem;margin-top:6px}
+textarea:focus,input:focus{outline:none;border-color:var(--a);box-shadow:0 0 0 2px var(--ag)}
+.otp-box{display:flex;justify-content:center;gap:10px;margin:18px 0 12px}
+.otp-d{width:54px;height:60px;text-align:center;font-size:1.8rem;font-weight:700;color:var(--a);background:#081426;border:2px solid var(--b);border-radius:12px}
+.err{color:#f87171;font-size:.82rem;margin-top:6px;display:none;text-align:center}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99;display:none;align-items:center;justify-content:center;padding:16px}
+.mbox{background:#0c192e;border-radius:14px;padding:20px;width:100%;max-width:360px;border:1px solid var(--b)}
+.acc{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:8px;cursor:pointer;margin-bottom:6px;background:#081426;border:1px solid var(--b)}
+.av{width:38px;height:38px;border-radius:50%;background:var(--a);color:#070f1e;display:flex;align-items:center;justify-content:center;font-weight:700}
+.screen{display:none!important}.screen.show{display:flex!important;flex-direction:column;gap:14px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.item{padding:10px 0;border-bottom:1px solid var(--b)}.item:last-child{border:none}.item strong{color:var(--a);display:block;margin-bottom:4px}
+</style>
 </head>
 <body>
-  <div class="app-container">
-
-    <!-- 1. TELA DE LOGIN -->
-    <div id="screen-auth" class="card screen active-screen">
-      <h1>Find My Phone</h1>
-      <p style="text-align: center;">Localize seu aparelho tocando palmas ou chamando por voz.</p>
-
-      <div style="margin-top: 16px;">
-        <label style="font-size: 0.85rem; color: var(--text-muted);">Digite seu e-mail</label>
-        <input
-          type="email"
-          id="auth-email-input"
-          placeholder="exemplo@email.com"
-          autocomplete="off"
-        />
-        <div id="auth-error" class="error-msg">Por favor, digite seu e-mail.</div>
-      </div>
-
-      <button type="button" class="btn-primary" style="margin-top: 10px;" id="btn-email-action">
-        Continuar com E-mail
-      </button>
-
-      <div style="text-align: center; margin: 10px 0; color: var(--text-subtle); font-size: 0.8rem;">ou</div>
-
-      <button type="button" id="btn-google-action" style="background: #ffffff; color: #0c192e; border-color: #ffffff;">
-        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c-.3-.7-.5-1.5-.5-2.4z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z"/></svg>
-        Entrar com Google
-      </button>
-
-      <button type="button" id="btn-guest-action" style="background: transparent; border: 1px dashed var(--border); color: var(--text-muted); font-size: 0.85rem; margin-top: 6px;">
-        Entrar sem login (Acesso Rápido)
-      </button>
+<div class="wrap">
+  <!-- AUTH -->
+  <div id="s-auth" class="card screen show">
+    <h1>Find My Phone</h1>
+    <p style="text-align:center">Localize seu aparelho tocando palmas ou chamando por voz.</p>
+    <div style="margin-top:16px">
+      <label style="font-size:.85rem;color:var(--tm)">Digite seu e-mail</label>
+      <input type="email" id="in-email" placeholder="exemplo@email.com" autocomplete="off">
     </div>
-
-    <!-- 2. TELA DO CÓDIGO OTP -->
-    <div id="screen-otp" class="card screen">
-      <div style="display: flex; align-items: center; justify-content: space-between;">
-        <h2>Código de Confirmação</h2>
-        <button type="button" id="btn-back-to-auth" style="width: auto; padding: 4px 10px; font-size: 0.8rem;">Trocar</button>
-      </div>
-
-      <p style="margin-top: 6px;">
-        Código de 4 dígitos enviado para:<br/>
-        <strong id="otp-target-email" style="color: var(--accent);"></strong>
-      </p>
-
-      <div style="background: rgba(56, 189, 248, 0.1); border: 1px dashed var(--accent); padding: 12px; border-radius: 10px; margin-top: 10px; text-align: center;">
-        <span style="font-size: 0.8rem; color: var(--text-subtle);">Código recebido no seu e-mail:</span>
-        <div id="otp-display-code" style="font-size: 1.8rem; font-weight: 700; color: var(--accent); letter-spacing: 6px; margin: 4px 0;">1234</div>
-        <button type="button" id="btn-autofill-otp" style="font-size: 0.78rem; padding: 6px 10px; background: rgba(56, 189, 248, 0.2); border-color: var(--accent); color: var(--accent);">
-          ⚡ Preencher Código Automaticamente
-        </button>
-      </div>
-
-      <div class="otp-inputs">
-        <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" id="otp-1" />
-        <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" id="otp-2" />
-        <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" id="otp-3" />
-        <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" id="otp-4" />
-      </div>
-
-      <div style="text-align: center; font-size: 0.9rem; color: var(--warning); font-weight: 600;">
-        Tempo restante: <span id="otp-seconds">300</span> segundos
-      </div>
-
-      <div id="otp-error" class="error-msg">Código incorreto! Digite os 4 dígitos certos.</div>
-
-      <button type="button" class="btn-primary" style="margin-top: 14px;" id="btn-confirm-otp">
-        Confirmar e Entrar
-      </button>
-
-      <button type="button" id="btn-resend-action" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.82rem; margin-top: 8px;">
-        Reenviar novo código
-      </button>
-    </div>
-
-    <!-- 3. TELA PRINCIPAL -->
-    <div id="screen-main" class="screen">
-      <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px;">
-        <div>
-          <span style="font-size: 0.75rem; color: var(--text-subtle); display: block;">Conectado como:</span>
-          <span id="user-display" style="font-size: 0.85rem; color: var(--accent); font-weight: 600;"></span>
-        </div>
-        <button type="button" id="btn-logout-action" style="width: auto; padding: 6px 12px; font-size: 0.8rem;">Sair</button>
-      </div>
-
-      <div id="mic-status-banner" class="status-banner idle">
-        <div class="status-dot"></div>
-        <div id="mic-status-text">Escuta inativa. Clique em "Ativar Busca".</div>
-      </div>
-
-      <div class="card">
-        <h3>Modo de Disparo</h3>
-        <p>Configuração permanente da sua conta:</p>
-        <div class="mode-selector">
-          <div id="mode-claps" class="mode-btn selected">👏 5 Palmas</div>
-          <div id="mode-voice" class="mode-btn">🎙️ Voz ("Find My")</div>
-        </div>
-        <button type="button" id="btn-toggle-listen" class="btn-primary">Ativar Busca do Celular</button>
-
-        <div style="margin-top: 14px;">
-          <div class="control-row">
-            <span>Sensibilidade do Som (1 a 100)</span>
-            <span id="sens-value" style="font-weight: 600; color: var(--accent);">60</span>
-          </div>
-          <input type="range" id="sensitivity-slider" min="10" max="100" step="10" value="60" />
-        </div>
-
-        <div style="margin-top: 12px;">
-          <div class="control-row">
-            <span>Volume Atual Captado:</span>
-            <span id="current-volume">0%</span>
-          </div>
-          <div class="meter-container"><div id="volume-meter" class="meter-fill"></div></div>
-        </div>
-
-        <div id="claps-counter-box" style="margin-top: 12px; font-size: 0.85rem; color: var(--accent);">
-          Palmas detectadas: <strong id="claps-count">0</strong> / 5
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Alarme Sonoro</h3>
-        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-          <button type="button" id="btn-record-audio">🎙️ Gravar Meu Próprio Alarme</button>
-          <button type="button" id="btn-open-file">📂 Importar Áudio do Aparelho</button>
-          <input type="file" id="file-input" accept="audio/*" style="display: none;" />
-          <div id="custom-audio-info" style="font-size: 0.8rem; color: var(--accent); display: none;"></div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;">
-            <button type="button" class="btn-accent" id="btn-test-alarm">Testar Alarme</button>
-            <button type="button" class="btn-danger" id="btn-stop-alarm">Parar Alarme</button>
-          </div>
-        </div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-        <button type="button" id="btn-nav-tutorial">📖 Como Usar</button>
-        <button type="button" id="btn-nav-feedback" style="border-color: var(--accent); color: var(--accent);">⭐ Dar Feedback</button>
-      </div>
-    </div>
-
-    <!-- 4. TELA DE FEEDBACK -->
-    <div id="screen-feedback" class="card screen">
-      <div style="display: flex; align-items: center; justify-content: space-between;">
-        <h2>Avaliação e Feedback</h2>
-        <button type="button" id="btn-back-feedback" style="width: auto; padding: 4px 10px; font-size: 0.8rem;">Voltar</button>
-      </div>
-      <p>Dê uma nota e deixe sua mensagem:</p>
-
-      <div class="star-rating" id="star-rating">
-        <span class="star active" data-val="1">★</span>
-        <span class="star active" data-val="2">★</span>
-        <span class="star active" data-val="3">★</span>
-        <span class="star active" data-val="4">★</span>
-        <span class="star active" data-val="5">★</span>
-      </div>
-      <div style="text-align: center; font-size: 0.85rem; color: var(--accent);" id="rating-label">5 estrelas</div>
-
-      <textarea id="feedback-comment" placeholder="Escreva aqui sua experiência ou sugestão..."></textarea>
-      <button type="button" class="btn-primary" style="margin-top: 10px;" id="btn-send-feedback">Enviar Feedback</button>
-
-      <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;" />
-      <h3>Mural de Feedbacks da Comunidade</h3>
-      <div id="feedback-list" style="margin-top: 10px; max-height: 220px; overflow-y: auto;"></div>
-    </div>
-
-    <!-- 5. TELA DE TUTORIAL -->
-    <div id="screen-tutorial" class="card screen">
-      <div style="display: flex; align-items: center; justify-content: space-between;">
-        <h2>Como se usa essa plataforma</h2>
-        <button type="button" id="btn-back-tutorial" style="width: auto; padding: 4px 10px; font-size: 0.8rem;">Voltar</button>
-      </div>
-      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px; font-size: 0.88rem; max-height: 480px; overflow-y: auto;">
-        <div class="tutorial-item">
-          <strong>🔐 Login com Código ou Google</strong>
-          <p>• <em>E-mail:</em> digite seu e-mail para receber um código de 4 dígitos e confirme em 300 segundos.<br/>
-          • <em>Google:</em> escolha uma conta com um clique e entre na hora.</p>
-        </div>
-        <div class="tutorial-item">
-          <strong>🟢 Indicador de Status do Microfone</strong>
-          <p>• <em>Cinza:</em> desligado. • <em>Amarelo:</em> aguardando permissão. • <em>Azul Claro:</em> escuta ativa. • <em>Vermelho:</em> microfone bloqueado.</p>
-        </div>
-        <div class="tutorial-item">
-          <strong>⭐ Botão "Dar Feedback"</strong>
-          <p>Escolha de 1 a 5 estrelas, escreva sua sugestão e envie para o mural da comunidade.</p>
-        </div>
-        <div class="tutorial-item">
-          <strong>👏 5 Palmas vs 🎙️ Voz</strong>
-          <p>• <em>5 Palmas:</em> 5 palmas nítidas em 4 segundos disparam o alerta.<br/>• <em>Voz:</em> diga "Find My Cellphone" ou "celular".</p>
-        </div>
-        <div class="tutorial-item">
-          <strong>▶️ Ativar Busca</strong>
-          <p>Ativa o monitoramento contínuo para achar o celular a qualquer momento.</p>
-        </div>
-        <div class="tutorial-item">
-          <strong>🎚️ Sensibilidade</strong>
-          <p>Padrão 60. Aumente para 70–80 se o ambiente estiver barulhento.</p>
-        </div>
-        <div class="tutorial-item">
-          <strong>🎙️ Gravar e 📂 Importar Áudio</strong>
-          <p>Grave sua voz ou escolha uma música do aparelho para tocar no alarme.</p>
-        </div>
-        <div class="tutorial-item">
-          <strong>🔔 Testar e 🛑 Parar Alarme</strong>
-          <p>Teste o volume e pare o som, luzes e vibração quando encontrar o celular.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- MODAL GOOGLE -->
-    <div id="google-modal" class="modal-overlay">
-      <div class="modal-box">
-        <h2 style="font-size: 1.1rem; color: #f0f9ff;">Escolha uma conta Google</h2>
-        <p style="font-size: 0.82rem; color: var(--text-subtle); margin-bottom: 12px;">Toque na conta para entrar na hora:</p>
-        
-        <div class="account-row" id="google-opt-1">
-          <div class="account-avatar">G</div>
-          <div>
-            <div style="font-size: 0.9rem; font-weight:600;">Minha Conta Google</div>
-            <div class="account-email">Entrar com conta padrão</div>
-          </div>
-        </div>
-
-        <div class="account-row" id="google-opt-2">
-          <div class="account-avatar" style="background:#0284c7; color:#fff;">P</div>
-          <div>
-            <div style="font-size: 0.9rem; font-weight:600;">Conta Pessoal / Estudos</div>
-            <div class="account-email">Entrar com conta secundária</div>
-          </div>
-        </div>
-
-        <div style="margin-top: 12px;">
-          <input type="email" id="custom-google-input" placeholder="Ou digite outro Gmail..." autocomplete="off" style="margin:0; font-size:0.85rem; padding:10px;" />
-          <button type="button" class="btn-primary" style="margin-top: 6px;" id="btn-custom-google">Entrar com este Gmail</button>
-        </div>
-
-        <button type="button" style="margin-top: 12px; background: transparent; border: none; color: var(--accent);" id="btn-close-google">Cancelar</button>
-      </div>
-    </div>
-
+    <button class="bp" style="margin-top:10px" id="b-email">Continuar com E-mail</button>
+    <div style="text-align:center;margin:10px 0;color:var(--ts);font-size:.8rem">ou</div>
+    <button id="b-google" style="background:#fff;color:#0c192e;border-color:#fff">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c-.3-.7-.5-1.5-.5-2.4z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z"/></svg>
+      Entrar com Google
+    </button>
+    <button id="b-guest" style="background:transparent;border:1px dashed var(--b);color:var(--tm);font-size:.85rem;margin-top:6px">Entrar sem login (Acesso Rápido)</button>
   </div>
 
-  <script>
-    // ==========================================
-    // 1. NAVEGAÇÃO E LOGIN (EXECUTADO IMEDIATAMENTE)
-    // ==========================    // ==========================================
-    // 2. MODOS E SENSIBILIDADE
-    // ==========================================
-    var selectedMode = 'claps';
-    var currentSensitivity = 60;
-    var modeClaps = document.getElementById('mode-claps');
-    var modeVoice = document.getElementById('mode-voice');
-    var clapsCountBox = document.getElementById('claps-counter-box');
+  <!-- OTP -->
+  <div id="s-otp" class="card screen">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2>Código de Confirmação</h2>
+      <button id="b-otp-back" style="width:auto;padding:4px 10px;font-size:.8rem">Trocar</button>
+    </div>
+    <p style="margin-top:6px">Código enviado para: <strong id="otp-email" style="color:var(--a)"></strong></p>
+    <div style="background:rgba(56,189,248,.1);border:1px dashed var(--a);padding:12px;border-radius:10px;margin-top:10px;text-align:center">
+      <span style="font-size:.8rem;color:var(--ts)">Código recebido no seu e-mail:</span>
+      <div id="otp-disp" style="font-size:1.8rem;font-weight:700;color:var(--a);letter-spacing:6px;margin:4px 0">1234</div>
+      <button id="b-otp-auto" style="font-size:.78rem;padding:6px;background:rgba(56,189,248,.2);border-color:var(--a);color:var(--a)">⚡ Preencher Automaticamente</button>
+    </div>
+    <div class="otp-box">
+      <input type="text" inputmode="numeric" maxlength="1" class="otp-d" id="o1">
+      <input type="text" inputmode="numeric" maxlength="1" class="otp-d" id="o2">
+      <input type="text" inputmode="numeric" maxlength="1" class="otp-d" id="o3">
+      <input type="text" inputmode="numeric" maxlength="1" class="otp-d" id="o4">
+    </div>
+    <div style="text-align:center;font-size:.9rem;color:#f59e0b;font-weight:600">Tempo restante: <span id="otp-sec">300</span>s</div>
+    <div id="otp-err" class="err">Código incorreto! Digite os 4 dígitos certos.</div>
+    <button class="bp" style="margin-top:14px" id="b-otp-confirm">Confirmar e Entrar</button>
+    <button id="b-otp-resend" style="background:transparent;border:none;color:var(--tm);font-size:.82rem;margin-top:8px">Reenviar novo código</button>
+  </div>
 
-    modeClaps.addEventListener('click', function() {
-      selectedMode = 'claps';
-      modeClaps.classList.add('selected');
-      modeVoice.classList.remove('selected');
-      clapsCountBox.style.display = 'block';
-      if (isListening) restartListening();
-    });
+  <!-- MAIN -->
+  <div id="s-main" class="screen">
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px">
+      <div><span style="font-size:.75rem;color:var(--ts);display:block">Conectado como:</span><span id="user-lbl" style="font-size:.85rem;color:var(--a);font-weight:600"></span></div>
+      <button id="b-logout" style="width:auto;padding:6px 12px;font-size:.8rem">Sair</button>
+    </div>
+    <div id="st-banner" class="status idle"><div class="dot"></div><div id="st-txt">Escuta inativa. Clique em "Ativar Busca".</div></div>
+    <div class="card">
+      <h3>Modo de Disparo</h3>
+      <p>Configuração permanente da sua conta:</p>
+      <div class="modes">
+        <div id="m-claps" class="mbtn sel">👏 5 Palmas</div>
+        <div id="m-voice" class="mbtn">🎙️ Voz ("Find My")</div>
+      </div>
+      <button id="b-listen" class="bp">Ativar Busca do Celular</button>
+      <div class="row" style="margin-top:14px"><span>Sensibilidade do Som (1 a 100)</span><span id="sens-lbl" style="font-weight:600;color:var(--a)">60</span></div>
+      <input type="range" id="sl-sens" min="10" max="100" step="10" value="60">
+      <div class="row"><span>Volume Atual:</span><span id="vol-lbl">0%</span></div>
+      <div class="meter"><div id="vol-fill" class="fill"></div></div>
+      <div id="claps-box" style="margin-top:12px;font-size:.85rem;color:var(--a)">Palmas detectadas: <strong id="clap-c">0</strong> / 5</div>
+    </div>
+    <div class="card">
+      <h3>Alarme Sonoro</h3>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+        <button id="b-rec">🎙️ Gravar Meu Próprio Alarme</button>
+        <button id="b-file">📂 Importar Áudio do Aparelho</button>
+        <input type="file" id="f-in" accept="audio/*" style="display:none">
+        <div id="aud-info" style="font-size:.8rem;color:var(--a);display:none"></div>
+        <div class="g2">
+          <button id="b-test" class="ba">Testar Alarme</button>
+          <button id="b-stop" class="bd">Parar Alarme</button>
+        </div>
+      </div>
+    </div>
+    <div class="g2">
+      <button id="b-nav-tut">📖 Como Usar</button>
+      <button id="b-nav-fb" style="border-color:var(--a);color:var(--a)">⭐ Dar Feedback</button>
+    </div>
+  </div>
 
-    modeVoice.addEventListener('click', function() {
-      selectedMode = 'voice';
-      modeVoice.classList.add('selected');
-      modeClaps.classList.remove('selected');
-      clapsCountBox.style.display = 'none';
-      if (isListening) restartListening();
-    });
+  <!-- FEEDBACK -->
+  <div id="s-fb" class="card screen">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2>Avaliação e Feedback</h2><button id="b-fb-back" style="width:auto;padding:4px 10px;font-size:.8rem">Voltar</button>
+    </div>
+    <p>Dê uma nota e deixe sua mensagem:</p>
+    <div class="stars" id="star-box">
+      <span class="star act" data-v="1">★</span><span class="star act" data-v="2">★</span><span class="star act" data-v="3">★</span><span class="star act" data-v="4">★</span><span class="star act" data-v="5">★</span>
+    </div>
+    <div id="star-lbl" style="text-align:center;font-size:.85rem;color:var(--a)">5 estrelas</div>
+    <textarea id="fb-msg" placeholder="Escreva sua experiência ou sugestão..."></textarea>
+    <button class="bp" style="margin-top:10px" id="b-fb-send">Enviar Feedback</button>
+    <hr style="border:none;border-top:1px solid var(--b);margin:16px 0">
+    <h3>Mural de Feedbacks</h3>
+    <div id="fb-list" style="margin-top:10px;max-height:220px;overflow-y:auto"></div>
+  </div>
 
-    document.getElementById('sensitivity-slider').addEventListener('input', function(e) {
-      currentSensitivity = parseInt(e.target.value, 10);
-      document.getElementById('sens-value').innerText = currentSensitivity;
-    });
+  <!-- TUTORIAL -->
+  <div id="s-tut" class="card screen">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2>Como se usa essa plataforma</h2><button id="b-tut-back" style="width:auto;padding:4px 10px;font-size:.8rem">Voltar</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;font-size:.88rem;max-height:480px;overflow-y:auto">
+      <div class="item"><strong>🔐 Login com Código ou Google</strong><p>E-mail envia 4 dígitos válidos por 300s. Google conecta em 1 clique.</p></div>
+      <div class="item"><strong>🟢 Indicador de Status</strong><p>Cinza: desligado. Amarelo: pedindo microfone. Azul: escutando. Vermelho: bloqueado.</p></div>
+      <div class="item"><strong>⭐ Dar Feedback</strong><p>Avalie de 1 a 5 estrelas e envie seu depoimento ao mural.</p></div>
+      <div class="item"><strong>👏 5 Palmas vs 🎙️ Voz</strong><p>5 palmas em 4s disparam o alarme. No modo voz, fale "Find My Cellphone" ou "celular".</p></div>
+      <div class="item"><strong>▶️ Ativar Busca</strong><p>Mantém o microfone ativo procurando os sons.</p></div>
+      <div class="item"><strong>🎚️ Sensibilidade</strong><p>Ajuste de 10 a 100 para evitar falsos alarmes em locais barulhentos.</p></div>
+      <div class="item"><strong>🎙️ Gravar e 📂 Importar Áudio</strong><p>Use sua própria voz ou uma música do celular como toque.</p></div>
+      <div class="item"><strong>🔔 Testar e 🛑 Parar Alarme</strong><p>Dispara luzes, vibração e sirene alta. Clique em Parar ao encontrar.</p></div>
+    </div>
+  </div>
 
-    // ==========================================
-    // 3. MICROFONE & ESCUTA
-    // ==========================================
-    var isListening = false;
-    var audioContext = null;
-    var analyserNode = null;
-    var microphoneStream = null;
-    var speechRecognizer = null;
-    var clapTimestamps = [];
+  <!-- MODAL GOOGLE -->
+  <div id="g-modal" class="modal">
+    <div class="mbox">
+      <h2 style="font-size:1.1rem">Escolha uma conta Google</h2>
+      <p style="font-size:.82rem;color:var(--ts);margin-bottom:12px">Toque na conta para entrar na hora:</p>
+      <div class="acc" id="g-opt1"><div class="av">G</div><div><div style="font-size:.9rem;font-weight:600">Minha Conta Google</div><div style="font-size:.82rem;color:var(--ts)">Entrar com conta padrão</div></div></div>
+      <div class="acc" id="g-opt2"><div class="av" style="background:#0284c7;color:#fff">P</div><div><div style="font-size:.9rem;font-weight:600">Conta Pessoal / Estudos</div><div style="font-size:.82rem;color:var(--ts)">Entrar com conta secundária</div></div></div>
+      <div style="margin-top:12px">
+        <input type="email" id="g-custom" placeholder="Ou digite outro Gmail..." autocomplete="off" style="margin:0;font-size:.85rem;padding:10px">
+        <button class="bp" style="margin-top:6px" id="b-g-custom">Entrar com este Gmail</button>
+      </div>
+      <button style="margin-top:12px;background:transparent;border:none;color:var(--a)" id="b-g-close">Cancelar</button>
+    </div>
+  </div>
+</div>
 
-    document.getElementById('btn-toggle-listen').addEventListener('click', function() {
-      if (isListening) {
-        stopListening();
-      } else {
-        startListening();
-      }
-    });
+<script>
+const $ = id => document.getElementById(id);
+let curUser = null, pEmail = '', expOtp = '1234', otpTimer = null, otpSec = 300;
+let mode = 'claps', sens = 60, isListen = false, audioCtx = null, analyser = null, micStream = null, speech = null, claps = [];
+let isAlarm = false, aTimer = null, sCtx = null, sOsc1 = null, sOsc2 = null, cAudioUrl = null, cAudioEl = null;
+let isRec = false, rec = null, chunks = [], curStars = 5;
 
-    function restartListening() {
-      stopListening();
-      setTimeout(startListening, 300);
+const feedList = [
+  { n: "Marcos S.", s: 5, c: "Me salvou! Achei o celular debaixo do sofá na hora.", d: "Ontem" },
+  { n: "Aline Costa", s: 5, c: "Modo de voz excelente e o som é bem alto.", d: "Há 2 dias" },
+  { n: "Lucas P.", s: 4, c: "Muito prático. Sensibilidade no 70 ficou perfeita.", d: "Há 4 dias" }
+];
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('show'));
+  $(id)?.classList.add('show');
+  window.scrollTo(0,0);
+}
+
+function login(name) {
+  curUser = name || 'Usuário';
+  $('user-lbl').innerText = curUser;
+  show('s-main');
+  renderFeed();
+}
+
+// AUTH
+$('b-email').onclick = () => {
+  pEmail = $('in-email').value.trim() || 'usuario@exemplo.com';
+  $('otp-email').innerText = pEmail;
+  expOtp = Math.floor(1000 + Math.random() * 9000) + '';
+  $('otp-disp').innerText = expOtp;
+  [1,2,3,4].forEach(i => $('o' + i).value = '');
+  $('otp-err').style.display = 'none';
+  clearInterval(otpTimer);
+  otpSec = 300;
+  $('otp-sec').innerText = otpSec;
+  otpTimer = setInterval(() => {
+    if (--otpSec <= 0) { clearInterval(otpTimer); $('otp-err').innerText = 'Tempo expirado.'; $('otp-err').style.display = 'block'; }
+    $('otp-sec').innerText = otpSec;
+  }, 1000);
+  show('s-otp');
+  setTimeout(() => $('o1').focus(), 150);
+};
+
+$('b-google').onclick = () => $('g-modal').style.display = 'flex';
+$('b-g-close').onclick = () => $('g-modal').style.display = 'none';
+$('g-opt1').onclick = () => { $('g-modal').style.display = 'none'; login('Minha Conta Google'); };
+$('g-opt2').onclick = () => { $('g-modal').style.display = 'none'; login('Conta Pessoal/Estudos'); };
+$('b-g-custom').onclick = () => { $('g-modal').style.display = 'none'; login($('g-custom').value.trim() || 'usuario@gmail.com'); };
+$('b-guest').onclick = () => login('Convidado');
+
+// OTP
+$('b-otp-back').onclick = () => { clearInterval(otpTimer); show('s-auth'); };
+$('b-otp-auto').onclick = () => { [1,2,3,4].forEach(i => $('o' + i).value = expOtp[i-1]); checkOtp(); };
+$('b-otp-confirm').onclick = checkOtp;
+$('b-otp-resend').onclick = () => $('b-email').click();
+
+function checkOtp() {
+  const code = [1,2,3,4].map(i => $('o' + i).value.trim()).join('');
+  if (code === expOtp) { clearInterval(otpTimer); login(pEmail); }
+  else { $('otp-err').innerText = 'Código incorreto!'; $('otp-err').style.display = 'block'; }
+}
+
+[1,2,3,4].forEach(i => {
+  $('o' + i).oninput = e => {
+    e.target.value = (e.target.value.replace(/\D/g, '')).slice(-1);
+    if (e.target.value && i < 4) $('o' + (i + 1)).focus();
+    if ([1,2,3,4].every(j => $('o' + j).value)) checkOtp();
+  };
+});
+
+// LOGOUT
+$('b-logout').onclick = () => { stopListen(); stopAlarm(); curUser = null; $('in-email').value = ''; show('s-auth'); };
+
+// MODOS & SENS
+$('m-claps').onclick = () => setMode('claps');
+$('m-voice').onclick = () => setMode('voice');
+function setMode(m) {
+  mode = m;
+  $('m-claps').classList.toggle('sel', m === 'claps');
+  $('m-voice').classList.toggle('sel', m === 'voice');
+  $('claps-box').style.display = m === 'claps' ? 'block' : 'none';
+  if (isListen) { stopListen(); setTimeout(startListen, 250); }
+}
+
+$('sl-sens').oninput = e => { sens = +e.target.value; $('sens-lbl').innerText = sens; };
+
+// ESCUTA
+$('b-listen').onclick = () => isListen ? stopListen() : startListen();
+
+async function startListen() {
+  setSt('waiting', 'Aguardando microfone...');
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    audioCtx.createMediaStreamSource(micStream).connect(analyser);
+    isListen = true;
+    $('b-listen').innerText = 'Pausar Busca';
+    $('b-listen').className = 'bd';
+
+    if (mode === 'claps') { setSt('active', 'Escuta ativa: Modo 5 Palmas'); loopClaps(); }
+    else { setSt('active', 'Escuta ativa: Modo Voz'); loopVoice(); }
+  } catch(e) {
+    setSt('blocked', 'Microfone bloqueado.');
+    isListen = false;
+  }
+}
+
+function stopListen() {
+  isListen = false;
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  if (audioCtx) try { audioCtx.close(); } catch(e){}
+  if (speech) try { speech.stop(); } catch(e){}
+  $('b-listen').innerText = 'Ativar Busca do Celular';
+  $('b-listen').className = 'bp';
+  setSt('idle', 'Escuta inativa. Clique em "Ativar Busca".');
+  $('vol-fill').style.width = '0%';
+  $('vol-lbl').innerText = '0%';
+}
+
+function setSt(cls, txt) {
+  $('st-banner').className = 'status ' + cls;
+  $('st-txt').innerText = txt;
+}
+
+function loopClaps() {
+  if (!isListen || mode !== 'claps') return;
+  const arr = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteTimeDomainData(arr);
+  let sum = 0;
+  for (let i = 0; i < arr.length; i++) { const n = (arr[i] - 128) / 128; sum += n * n; }
+  const vol = Math.min(100, Math.round(Math.sqrt(sum / arr.length) * 280));
+  $('vol-fill').style.width = vol + '%';
+  $('vol-lbl').innerText = vol + '%';
+
+  if (vol >= sens) {
+    const now = Date.now();
+    if (!claps.length || now - claps[claps.length - 1] > 250) {
+      claps.push(now);
+      claps = claps.filter(t => now - t <= 4000);
+      $('clap-c').innerText = claps.length;
+      if (claps.length >= 5) { claps = []; $('clap-c').innerText = '0'; triggerAlarm(); }
     }
+  }
+  requestAnimationFrame(loopClaps);
+}
 
-    async function startListening() {
-      setMicStatus('waiting', 'Aguardando permissão de microfone...');
-      try {
-        microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyserNode = audioContext.createAnalyser();
-        analyserNode.fftSize = 512;
-        audioContext.createMediaStreamSource(microphoneStream).connect(analyserNode);
-
-        isListening = true;
-        var btn = document.getElementById('btn-toggle-listen');
-        btn.innerText = 'Pausar Busca';
-        btn.className = 'btn-danger';
-
-        if (selectedMode === 'claps') {
-          setMicStatus('active', 'Escuta ativa: Modo 5 Palmas');
-          monitorClaps();
-        } else {
-          setMicStatus('active', 'Escuta ativa: Modo Voz ("Find My")');
-          startVoiceRecognition();
-        }
-      } catch (err) {
-        setMicStatus('blocked', 'Microfone bloqueado ou sem permissão.');
-        isListening = false;
-        var btn = document.getElementById('btn-toggle-listen');
-        btn.innerText = 'Ativar Busca do Celular';
-        btn.className = 'btn-primary';
-      }
+function loopVoice() {
+  const S = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!S) return setSt('blocked', 'Reconhecimento de voz não suportado.');
+  speech = new S();
+  speech.continuous = true;
+  speech.interimResults = true;
+  speech.lang = 'pt-BR';
+  speech.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const p = e.results[i][0].transcript.toLowerCase();
+      if (/find my|celulafind my|celular|cellphone|cadê/.test(p)) triggerAlarm();
     }
+  };
+  speech.onerror = () => isListen && trySpeech();
+  speech.onend = () => isListen && mode === 'voice' && trySpeech();
+  trySpeech();
+}
+function trySpeech() { try { speech.start(); } catch(e){} }
 
-    function stopListening() {
-      isListening = false;
-      if (microphoneStream) {
-        microphoneStream.getTracks().forEach(function(t) { t.stop(); });
-        microphoneStream = null;
-      }
-      if (audioContext) {
-        try { audioContext.close(); } catch(e){}
-        audioContext = null;
-      }
-      if (speechRecognizer) {
-        try { speechRecognizer.stop(); } catch(e){}
-        speechRecognizer = null;
-      }
-      var btn = document.getElementById('btn-toggle-listen');
-      btn.innerText = 'Ativar Busca do Celular';
-      btn.className = 'btn-primary';
-      setMicStatus('idle', 'Escuta inativa. Clique em "Ativar Busca".');
-      document.getElementById('volume-meter').style.width = '0%';
-      document.getElementById('current-volume').innerText = '0%';
-    }
+// ALARME
+$('b-test').onclick = triggerAlarm;
+$('b-stop').onclick = stopAlarm;
 
-    function setMicStatus(cls, msg) {
-      var banner = document.getElementById('mic-status-banner');
-      var txt = document.getElementById('mic-status-text');
-      if (banner) banner.className = 'status-banner ' + cls;
-      if (txt) txt.innerText = msg;
-    }
+function triggerAlarm() {
+  if (isAlarm) return;
+  isAlarm = true;
+  if (cAudioUrl) {
+    if (!cAudioEl) cAudioEl = new Audio();
+    cAudioEl.src = cAudioUrl; cAudioEl.loop = true; cAudioEl.volume = 1; cAudioEl.play();
+  } else startSiren();
+  let t = false;
+  aTimer = setInterval(() => {
+    t = !t;
+    document.body.className = t ? 'f1' : 'f2';
+    if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100]);
+  }, 350);
+}
 
-    function monitorClaps() {
-      if (!isListening || selectedMode !== 'claps') return;
-      var dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-      analyserNode.getByteTimeDomainData(dataArray);
+function stopAlarm() {
+  isAlarm = false;
+  clearInterval(aTimer);
+  document.body.className = '';
+  if (cAudioEl) { cAudioEl.pause(); cAudioEl.currentTime = 0; }
+  if (sOsc1) { try{sOsc1.stop();}catch(e){} sOsc1 = null; }
+  if (sOsc2) { try{sOsc2.stop();}catch(e){} sOsc2 = null; }
+  if (sCtx) { try{sCtx.close();}catch(e){} sCtx = null; }
+}
 
-      var sum = 0;
-      for (var i = 0; i < dataArray.length; i++) {
-        var n = (dataArray[i] - 128) / 128;
-        sum += n * n;
-      }
-      var rms = Math.sqrt(sum / dataArray.length);
-      var volumeScore = Math.min(100, Math.round(rms * 280));
+function startSiren() {
+  sCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const g = sCtx.createGain(); g.gain.setValueAtTime(1, sCtx.currentTime); g.connect(sCtx.destination);
+  sOsc1 = sCtx.createOscillator(); sOsc2 = sCtx.createOscillator();
+  sOsc1.type = 'sawtooth'; sOsc2.type = 'square';
+  sOsc1.frequency.value = 800; sOsc2.frequency.value = 950;
+  sOsc1.connect(g); sOsc2.connect(g);
+  sOsc1.start(); sOsc2.start();
+}
 
-      document.getElementById('volume-meter').style.width = volumeScore + '%';
-      document.getElementById('current-volume').innerText = volumeScore + '%';
-
-      if (volumeScore >= currentSensitivity) {
-        var now = Date.now();
-        if (clapTimestamps.length === 0 || (now - clapTimestamps[clapTimestamps.length - 1] > 250)) {
-          clapTimestamps.push(now);
-          clapTimestamps = clapTimestamps.filter(function(t) { return now - t <= 4000; });
-          document.getElementById('claps-count').innerText = clapTimestamps.length;
-
-          if (clapTimestamps.length >= 5) {
-            clapTimestamps = [];
-            document.getElementById('claps-count').innerText = '0';
-            triggerAlarm();
-          }
-        }
-      }
-      requestAnimationFrame(monitorClaps);
-    }
-
-    function startVoiceRecognition() {
-      var Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!Speech) {
-        setMicStatus('blocked', 'Reconhecimento de voz não suportado neste navegador.');
-        return;
-      }
-      speechRecognizer = new Speech();
-      speechRecognizer.continuous = true;
-      speechRecognizer.interimResults = true;
-      speechRecognizer.lang = 'pt-BR';
-      speechRecognizer.onresult = function(event) {
-        for (var i = event.resultIndex; i < event.results.length; ++i) {
-          var phrase = event.results[i][0].transcript.toLowerCase();
-          if (phrase.includes('find my') || phrase.includes('celular') || phrase.includes('cellphone') || phrase.includes('cadê')) {
-            triggerAlarm();
-          }
-        }
+// GRAVAÇÃO & ARQUIVO
+$('b-rec').onclick = async () => {
+  const b = $('b-rec');
+  if (!isRec) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      rec = new MediaRecorder(stream);
+      chunks = [];
+      rec.ondataavailable = e => chunks.push(e.data);
+      rec.onstop = () => {
+        cAudioUrl = URL.createObjectURL(new Blob(chunks, { type: 'audio/webm' }));
+        $('aud-info').style.display = 'block';
+        $('aud-info').innerText = '✓ Áudio gravado pronto para o alarme';
       };
-      speechRecognizer.onerror = function() {
-        if (isListening) { try { speechRecognizer.start(); } catch(e){} }
-      };
-      speechRecognizer.onend = function() {
-        if (isListening && selectedMode === 'voice') { try { speechRecognizer.start(); } catch(e){} }
-      };
-      try { speechRecognizer.start(); } catch(e){}
-    }
+      rec.start(); isRec = true; b.innerText = '⏹️ Parar e Salvar Gravação';
+    } catch(e) { alert('Permissão de gravação negada.'); }
+  } else {
+    rec?.stop(); isRec = false; b.innerText = '🎙️ Gravar Meu Próprio Alarme';
+  }
+};
 
-    // ==========================================
-    // 4. ALARME & SOM (INICIALIZADO APENAS AO TOCAR)
-    // ==========================================
-    var isAlarmRunning = false;
-    var alarmInterval = null;
-    var sirenCtx = null;
-    var sirenOsc1 = null;
-    var sirenOsc2 = null;
-    var customAudioUrl = null;
-    var customAudioEl = null;
+$('b-file').onclick = () => $('f-in').click();
+$('f-in').onchange = e => {
+  const f = e.target.files[0];
+  if (f) {
+    cAudioUrl = URL.createObjectURL(f);
+    $('aud-info').style.display = 'block';
+    $('aud-info').innerText = '✓ Áudio carregado: ' + f.name;
+  }
+};
 
-    document.getElementById('btn-test-alarm').addEventListener('click', triggerAlarm);
-    document.getElementById('btn-stop-alarm').addEventListener('click', stopAlarm);
+// FEEDBACK & TUTORIAL
+$('b-nav-fb').onclick = () => { renderFeed(); show('s-fb'); };
+$('b-fb-back').onclick = () => show('s-main');
+$('b-nav-tut').onclick = () => show('s-tut');
+$('b-tut-back').onclick = () => show('s-main');
 
-    function triggerAlarm() {
-      if (isAlarmRunning) return;
-      isAlarmRunning = true;
+document.querySelectorAll('#star-box .star').forEach(s => {
+  s.onclick = () => {
+    curStars = +s.dataset.v;
+    document.querySelectorAll('#star-box .star').forEach((st, idx) => st.classList.toggle('act', idx < curStars));
+    $('star-lbl').innerText = curStars + ' estrela' + (curStars > 1 ? 's' : '');
+  };
+});
 
-      if (customAudioUrl) {
-        if (!customAudioEl) customAudioEl = new Audio();
-        customAudioEl.src = customAudioUrl;
-        customAudioEl.loop = true;
-        customAudioEl.volume = 1.0;
-        customAudioEl.play();
-      } else {
-        startSiren();
-      }
+function renderFeed() {
+  const el = $('fb-list'); if (!el) return;
+  el.innerHTML = feedList.map(item => `
+    <div class="item">
+      <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--tm);margin-bottom:4px">
+        <strong>${item.n}</strong><span>${'★'.repeat(item.s) + '☆'.repeat(5 - item.s)}</span>
+      </div>
+      <p style="color:var(--t);font-size:.85rem">${item.c}</p>
+      <span style="font-size:.75rem;color:var(--ts)">${item.d}</span>
+    </div>
+  `).join('');
+}
 
-      var toggle = false;
-      alarmInterval = setInterval(function() {
-        toggle = !toggle;
-        document.body.className = toggle ? 'alarm-flash-1' : 'alarm-flash-2';
-        if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100]);
-      }, 350);
-    }
-
-    function stopAlarm() {
-      isAlarmRunning = false;
-      clearInterval(alarmInterval);
-      document.body.className = '';
-      if (customAudioEl) {
-        customAudioEl.pause();
-        customAudioEl.currentTime = 0;
-      }
-      stopSiren();
-    }
-
-    function startSiren() {
-      sirenCtx = new (window.AudioContext || window.webkitAudioContext)();
-      var gain = sirenCtx.createGain();
-      gain.gain.setValueAtTime(1.0, sirenCtx.currentTime);
-      gain.connect(sirenCtx.destination);
-
-      sirenOsc1 = sirenCtx.createOscillator();
-      sirenOsc2 = sirenCtx.createOscillator();
-      sirenOsc1.type = 'sawtooth';
-      sirenOsc2.type = 'square';
-      sirenOsc1.frequency.value = 800;
-      sirenOsc2.frequency.value = 950;
-      sirenOsc1.connect(gain);
-      sirenOsc2.connect(gain);
-      sirenOsc1.start();
-      sirenOsc2.start();
-    }
-
-    function stopSiren() {
-      if (sirenOsc1) { try { sirenOsc1.stop(); } catch(e){} sirenOsc1 = null; }
-      if (sirenOsc2) { try { sirenOsc2.stop(); } catch(e){} sirenOsc2 = null; }
-      if (sirenCtx) { try { sirenCtx.close(); } catch(e){} sirenCtx = null; }
-    }
-
-    // ==========================================
-    // 5. GRAVAÇÃO E IMPORTAÇÃO
-    // ==========================================
-    var isRecording = false;
-    var mediaRecorder = null;
-    var recordChunks = [];
-
-    document.getElementById('btn-record-audio').addEventListener('click', async function() {
-      var btn = document.getElementById('btn-record-audio');
-      if (!isRecording) {
-        try {
-          var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          mediaRecorder = new MediaRecorder(stream);
-          recordChunks = [];
-          mediaRecorder.ondataavailable = function(e) { recordChunks.push(e.data); };
-          mediaRecorder.onstop = function() {
-            var blob = new Blob(recordChunks, { type: 'audio/webm' });
-            customAudioUrl = URL.createObjectURL(blob);
-            var info = document.getElementById('custom-audio-info');
-            info.style.display = 'block';
-            info.innerText = '✓ Áudio gravado pronto para o alarme';
-          };
-          mediaRecorder.start();
-          isRecording = true;
-          btn.innerText = '⏹️ Parar e Salvar Gravação';
-        } catch(e) {
-          alert('Permissão de gravação negada.');
-        }
-      } else {
-        if (mediaRecorder) mediaRecorder.stop();
-        isRecording = false;
-        btn.innerText = '🎙️ Gravar Meu Próprio Alarme';
-      }
-    });
-
-    document.getElementById('btn-open-file').addEventListener('click', function() {
-      document.getElementById('file-input').click();
-    });
-
-    document.getElementById('file-input').addEventListener('change', function(e) {
-      var file = e.target.files[0];
-      if (file) {
-        customAudioUrl = URL.createObjectURL(file);
-        var info = document.getElementById('custom-audio-info');
-        info.style.display = 'block';
-        info.innerText = '✓ Áudio carregado: ' + file.name;
-      }
-    });
-
-    // ==========================================
-    // 6. FEEDBACK & TUTORIAL
-    // ==========================================
-    var selectedRating = 5;
-    var initialFeedbacks = [
-      { name: "Marcos S.", rating: 5, comment: "Me salvou hoje de manhã! Achei o celular debaixo do sofá na hora.", date: "Ontem" },
-      { name: "Aline Costa", rating: 5, comment: "O modo de voz funciona super bem, o som é bem alto.", date: "Há 2 dias" },
-      { name: "Lucas P.", rating: 4, comment: "Muito prático. Ajustei a sensibilidade para 70 e ficou perfeito.", date: "Há 4 dias" }
-    ];
-
-    document.getElementById('btn-nav-feedback').addEventListener('click', function() {
-      loadFeedbacks();
-      showScreen('screen-feedback');
-    });
-    document.getElementById('btn-back-feedback').addEventListener('click', function() {
-      showScreen('screen-main');
-    });
-
-    document.getElementById('btn-nav-tutorial').addEventListener('click', function() {
-      showScreen('screen-tutorial');
-    });
-    document.getElementById('btn-back-tutorial').addEventListener('click', function() {
-      showScreen('screen-main');
-    });
-
-    document.querySelectorAll('#star-rating .star').forEach(function(star) {
-      star.addEventListener('click', function() {
-        var val = parseInt(star.getAttribute('data-val'), 10);
-        selectedRating = val;
-        document.querySelectorAll('#star-rating .star').forEach(function(s, idx) {
-          s.classList.toggle('active', idx < val);
-        });
-        document.getElementById('rating-label').innerText = val + ' estrela' + (val > 1 ? 's' : '');
-      });
-    });
-
-    function loadFeedbacks() {
-      var list = document.getElementById('feedback-list');
-      if (!list) return;
-      list.innerHTML = '';
-      initialFeedbacks.forEach(function(item) {
-        var div = document.createElement('div');
-        div.className = 'feedback-item';
-        div.innerHTML =
-          '<div class="feedback-header"><strong>' + item.name + '</strong><span>' +
-          '★'.repeat(item.rating) + '☆'.repeat(5 - item.rating) + '</span></div>' +
-          '<p style="color:var(--text);font-size:0.85rem;">' + item.comment + '</p>' +
-          '<span style="font-size:0.75rem;color:var(--text-subtle);">' + item.date + '</span>';
-        list.appendChild(div);
-      });
-    }
-
-    document.getElementById('btn-send-feedback').addEventListener('click', function() {
-      var val = document.getElementById('feedback-comment').value.trim();
-      if (!val) {
-        alert('Digite uma mensagem antes de enviar.');
-        return;
-      }
-      initialFeedbacks.unshift({
-        name: currentUser || 'Usuário',
-        rating: selectedRating,
-        comment: val,
-        date: 'Agora'
-      });
-      document.getElementById('feedback-comment').value = '';
-      loadFeedbacks();
-      alert('Feedback enviado com sucesso!');
-    });
-  </script>
+$('b-fb-send').onclick = () => {
+  const val = $('fb-msg').value.trim();
+  if (!val) return alert('Digite uma mensagem antes de enviar.');
+  feedList.unshift({ n: curUser || 'Usuário', s: curStars, c: val, d: 'Agora' });
+  $('fb-msg').value = '';
+  renderFeed();
+  alert('Feedback enviado com sucesso!');
+};
+</script>
 </body>
 </html>
-
-    var currentUser = null;
-    var pendingEmail = '';
-    var expectedOtp = '1234';
-    var otpTimerInterval = null;
-    var otpRemainingSeconds = 300;
-
-    function showScreen(screenId) {
-      var all = document.querySelectorAll('.screen');
-      for (var i = 0; i < all.length; i++) {
-        all[i].classList.remove('active-screen');
-      }
-      var target = document.getElementById(screenId);
-      if (target) {
-        target.classList.add('active-screen');
-        window.scrollTo(0, 0);
-      }
-    }
-
-    function loginUser(userName) {
-      currentUser = userName || 'Usuário';
-      var disp = document.getElementById('user-display');
-      if (disp) disp.innerText = currentUser;
-      showScreen('screen-main');
-      loadFeedbacks();
-    }
-
-    // BOTÃO CONTINUAR COM E-MAIL
-    document.getElementById('btn-email-action').addEventListener('click', function() {
-      var input = document.getElementById('auth-email-input');
-      var email = input ? input.value.trim() : '';
-      if (!email) {
-        email = 'usuario@exemplo.com';
-      }
-      pendingEmail = email;
-      document.getElementById('otp-target-email').innerText = email;
-
-      expectedOtp = Math.floor(1000 + Math.random() * 9000).toString();
-      document.getElementById('otp-display-code').innerText = expectedOtp;
-
-      for (var i = 1; i <= 4; i++) {
-        var el = document.getElementById('otp-' + i);
-        if (el) el.value = '';
-      }
-      document.getElementById('otp-error').style.display = 'none';
-
-      startOtpTimer(300);
-      showScreen('screen-otp');
-      setTimeout(function() {
-        var f = document.getElementById('otp-1');
-        if (f) f.focus();
-      }, 200);
-    });
-
-    // BOTÃO GOOGLE
-    document.getElementById('btn-google-action').addEventListener('click', function() {
-      document.getElementById('google-modal').style.display = 'flex';
-    });
-
-    document.getElementById('btn-close-google').addEventListener('click', function() {
-      document.getElementById('google-modal').style.display = 'none';
-    });
-
-    document.getElementById('google-opt-1').addEventListener('click', function() {
-      document.getElementById('google-modal').style.display = 'none';
-      loginUser('Minha Conta Google');
-    });
-
-    document.getElementById('google-opt-2').addEventListener('click', function() {
-      document.getElementById('google-modal').style.display = 'none';
-      loginUser('Conta Pessoal/Estudos');
-    });
-
-    document.getElementById('btn-custom-google').addEventListener('click', function() {
-      var val = document.getElementById('custom-google-input').value.trim() || 'usuario@gmail.com';
-      document.getElementById('google-modal').style.display = 'none';
-      loginUser(val);
-    });
-
-    // BOTÃO ACESSO RÁPIDO
-    document.getElementById('btn-guest-action').addEventListener('click', function() {
-      loginUser('Convidado');
-    });
-
-    // BOTÃO VOLTAR DO OTP
-    document.getElementById('btn-back-to-auth').addEventListener('click', function() {
-      clearInterval(otpTimerInterval);
-      showScreen('screen-auth');
-    });
-
-    // PREENCHIMENTO RÁPIDO DO OTP
-    document.getElementById('btn-autofill-otp').addEventListener('click', function() {
-      for (var i = 1; i <= 4; i++) {
-        var el = document.getElementById('otp-' + i);
-        if (el) el.value = expectedOtp[i - 1];
-      }
-      verifyOtp();
-    });
-
-    document.getElementById('btn-confirm-otp').addEventListener('click', verifyOtp);
-    document.getElementById('btn-resend-action').addEventListener('click', function() {
-      document.getElementById('btn-email-action').click();
-    });
-
-    function verifyOtp() {
-      var code = '';
-      for (var i = 1; i <= 4; i++) {
-        var el = document.getElementById('otp-' + i);
-        if (el) code += el.value.trim();
-      }
-      if (code === expectedOtp) {
-        clearInterval(otpTimerInterval);
-        loginUser(pendingEmail);
-      } else {
-        var err = document.getElementById('otp-error');
-        if (err) {
-          err.innerText = 'Código incorreto! Confira os 4 dígitos.';
-          err.style.display = 'block';
-        }
-      }
-    }
-
-    function startOtpTimer(sec) {
-      clearInterval(otpTimerInterval);
-      otpRemainingSeconds = sec;
-      var lbl = document.getElementById('otp-seconds');
-      if (lbl) lbl.innerText = otpRemainingSeconds;
-
-      otpTimerInterval = setInterval(function() {
-        otpRemainingSeconds--;
-        if (lbl) lbl.innerText = otpRemainingSeconds;
-        if (otpRemainingSeconds <= 0) {
-          clearInterval(otpTimerInterval);
-          var err = document.getElementById('otp-error');
-          if (err) {
-            err.innerText = 'Tempo expirado. Clique em reenviar novo código.';
-            err.style.display = 'block';
-          }
-        }
-      }, 1000);
-    }
-
-    // Configuração dos 4 campos OTP
-    [1, 2, 3, 4].forEach(function(num) {
-      var input = document.getElementById('otp-' + num);
-      if (input) {
-        input.addEventListener('input', function(e) {
-          var val = e.target.value.replace(/\D/g, '');
-          e.target.value = val ? val[val.length - 1] : '';
-          if (e.target.value && num < 4) {
-            var next = document.getElementById('otp-' + (num + 1));
-            if (next) next.focus();
-          }
-          var allFilled = true;
-          for (var j = 1; j <= 4; j++) {
-            if (!document.getElementById('otp-' + j).value) allFilled = false;
-          }
-          if (allFilled) verifyOtp();
-        });
-      }
-    });
-
-    // LOGOUT
-    document.getElementById('btn-logout-action').addEventListener('click', function() {
-      stopListening();
-      stopAlarm();
-      currentUser = null;
-      var input = document.getElementById('auth-email-input');
-      if (input) input.value = '';
-      showScreen('screen-auth');
-    });
