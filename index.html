@@ -2,15 +2,53 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Find My Phone - Acha Celular</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
-body{background:#0f172a;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 16px;gap:14px}
-body.flash{background:#fff !important}
-h1{color:#38bdf8;font-size:1.7rem}
-.sub{color:#94a3b8;font-size:.85rem;text-align:center;max-width:380px;line-height:1.3}
-.main{display:flex;flex-direction:column;align-items:center;gap:12px;margin:10px 0}
-.btn-big{width:160px;height:160px;border-radius:50%;border:4px solid #38bdf8;background:#1e293b;color:#38bdf8;font-weight:800;font-size:1.1rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;box-shadow:0 0 20px rgba(56,189,248,.3)}
-.btn-big.active{border-color:#ef4444;color:#f87171;animation:pulse 1.5s infinite}
-@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.05)}100%{transform:scale(
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find My Phone</title>
+</head>
+<body style="background:#0f172a;color:white;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;padding:20px;gap:15px">
+<h1 style="color:#38bdf8">Find My Phone</h1>
+<button id="btn" style="width:160px;height:160px;border-radius:50%;border:4px solid #38bdf8;background:#1e293b;color:#38bdf8;font-weight:bold;font-size:18px">🎤 ATIVAR</button>
+<p>Palmas: <span id="c">0</span>/5</p>
+<p>Sensibilidade: <span id="v">65</span></p>
+<input id="s" type="range" min="20" max="95" value="65" style="width:280px">
+<div id="barra" style="width:280px;height:20px;background:#111;border-radius:10px"><div id="fill" style="height:100%;width:0%;background:#38bdf8"></div></div>
+<button id="stop" style="display:none;background:red;color:white;padding:15px;border:none;border-radius:8px;width:280px">PARAR ALARME</button>
+<p id="msg"></p>
+<script>
+let ctx,ana,mic,on=false,al=false,count=0,last=0,st=null,cool=false;
+const btn=document.getElementById('btn'),c=document.getElementById('c'),s=document.getElementById('s'),v=document.getElementById('v'),fill=document.getElementById('fill'),stop=document.getElementById('stop'),msg=document.getElementById('msg');
+s.oninput=()=>v.textContent=s.value;
+btn.onclick=async()=>{
+ if(!on){
+  ctx=new AudioContext(); ana=ctx.createAnalyser(); ana.fftSize=512;
+  let stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  ctx.createMediaStreamSource(stream).connect(ana);
+  on=true; btn.textContent='OUVINDO...'; btn.style.borderColor='red'; btn.style.color='red';
+  loop();
+ }else{ on=false; btn.textContent='🎤 ATIVAR'; btn.style.borderColor='#38bdf8'; btn.style.color='#38bdf8'; count=0; c.textContent=0; }
+};
+function loop(){
+ if(!on) return;
+ let b=new Uint8Array(ana.frequencyBinCount); ana.getByteFrequencyData(b);
+ let sum=0; for(let x of b) sum+=x; let lvl=Math.round((sum/b.length)/1.5); if(lvl>100) lvl=100;
+ fill.style.width=lvl+'%';
+ let th=parseInt(s.value);
+ let now=Date.now();
+ if(count>0 && now-last>4000){count=0; c.textContent=0;}
+ if(lvl>=th){
+  if(!st) st=now;
+  if(now-st>300 && !cool){ cool=true; count++; last=now; c.textContent=count; msg.textContent='Palma! '+count+'/5'; if(count>=5){count=0; c.textContent=0; alarm();} setTimeout(()=>cool=false,600); }
+ }else st=null;
+ requestAnimationFrame(loop);
+}
+function alarm(){
+ al=true; stop.style.display='block'; msg.textContent='ACHOU!!';
+ let ac=new AudioContext(); let o=ac.createOscillator(); let g=ac.createGain();
+ o.connect(g); g.connect(ac.destination); o.start(); g.gain.value=1;
+ let up=true; let id=setInterval(()=>{ if(!al){clearInterval(id); o.stop(); ac.close(); return;} o.frequency.value=up?1200:600; up=!up; document.body.style.background=up?'#fff':'#0f172a'; },250);
+ if(navigator.vibrate) navigator.vibrate([600,200,600,200,600]);
+}
+stop.onclick=()=>{al=false; stop.style.display='none'; document.body.style.background='#0f172a'; msg.textContent='Parado'; if(navigator.vibrate) navigator.vibrate(0);}
+</script>
+</body>
+</html>
