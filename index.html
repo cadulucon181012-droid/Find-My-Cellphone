@@ -1,31 +1,111 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Find My Phone</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
-body{background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:center;padding:20px;gap:12px;min-height:100vh}
-body.flash{background:#fff!important}
-.circle{width:170px;height:170px;border-radius:50%;border:5px solid #38bdf8;background:#1e293b;color:#38bdf8;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;cursor:pointer}
-.circle.on{border-color:#ef4444;color:#ef4444;animation:pulse 1s infinite}
-@keyframes pulse{0%{scale:1}50%{scale:1.08}100%{scale:1}}
-.card{width:100%;max-width:380px;background:#1e293b;border:1px solid #334155;border-radius:16px;padding:14px}
-.bar{height:20px;background:#000;border-radius:10px;overflow:hidden}
-.fill{height:100%;width:0%;background:#38bdf8}
-button{padding:10px;border-radius:8px;border:0;background:#334155;color:#fff;font-weight:600}
-button:active{scale:.97}
-</style>
-</head>
-<body>
-<h1 style="color:#38bdf8">Find My Phone</h1>
-<div id="mainBtn" class="circle"><span style="font-size:30px">🎤</span><span id="mainTxt">ATIVAR</span></div>
-<div>Palmas: <b id="cnt">0</b>/5</div>
-<div class="card">
-<div style="display:flex;justify-content:space-between">Sensibilidade <b id="sVal">20</b></div>
-<input id="sRange" type="range" min="10" max="90" value="20" style="width:100%">
-<div>Nível: <span id="lvl">0</span>/100</div>
-<div class="bar"><div id="fill" class="fill"></div></div>
-<div id="msg" style="text-align:center;color:#38bdf8;margin:8px 0">Parado</
+import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Flashlight, Hand, Mic, MicOff, Volume2, Smartphone, VolumeX } from "lucide-react";
+
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Find My Phone — Ache seu celular batendo palmas" },
+      {
+        name: "description",
+        content:
+          "Localize seu celular em qualquer canto da casa. Bata palmas 5 vezes para acionar sirene, lanterna piscante e vibração.",
+      },
+    ],
+  }),
+  component: Index,
+});
+
+const REQUIRED_CLAPS = 5;
+const MIN_SOUND_DURATION_MS = 300; // 0.3s
+const CLAP_TIMEOUT_MS = 4000;
+
+function Index() {
+  const [listening, setListening] = useState(false);
+  const [testingMic, setTestingMic] = useState(false);
+  const [alerting, setAlerting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [torchAvailable, setTorchAvailable] = useState(false);
+  const [sensitivity, setSensitivity] = useState(60);
+  const [currentLevel, setCurrentLevel] = useState(0);
+  const [clapCount, setClapCount] = useState(0);
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const rafRef = useRef<number>(0);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   
+  const soundStartTimeRef = useRef<number | null>(null);
+  const clapCooldownRef = useRef(false);
+  const lastClapTimeRef = useRef(0);
+  const clapCountRef = useRef(0);
+  const sensitivityRef = useRef(60);
+
+  const alarmIntervalRef = useRef<number | null>(null);
+  const torchIntervalRef = useRef<number | null>(null);
+  const vibIntervalRef = useRef<number | null>(null);
+  const alertingRef = useRef(false);
+
+  useEffect(() => {
+    sensitivityRef.current = sensitivity;
+  }, [sensitivity]);
+
+  const stopTorch = useCallback(async () => {
+    if (torchIntervalRef.current) {
+      clearInterval(torchIntervalRef.current);
+      torchIntervalRef.current = null;
+    }
+    const track = videoStreamRef.current?.getVideoTracks()[0];
+    if (track) {
+      try {
+        await track.applyConstraints({ advanced: [{ torch: false } as MediaTrackConstraintSet] });
+      } catch {}
+    }
+  }, []);
+
+  const stopAlert = useCallback(async () => {
+    alertingRef.current = false;
+    setAlerting(false);
+
+    if (alarmIntervalRef.current) {
+      clearInterval(alarmIntervalRef.current);
+      alarmIntervalRef.current = null;
+    }
+    if (vibIntervalRef.current) {
+      clearInterval(vibIntervalRef.current);
+      vibIntervalRef.current = null;
+    }
+    if ("vibrate" in navigator) {
+      navigator.vibrate(0);
+    }
+    await stopTorch();
+  }, [stopTorch]);
+
+  const beep = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.01, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.8, ctx.currentTime + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.38);
+  }, []);
+
+  const triggerAlert = useCallback(async () => {
+    if (alertingRef.current) return;
+    alertingRef.current = true;
+    setAlerting(true);
+
+    beep();
+    alarmIntervalRef.current = window.setInterval(beep, 400);
+
+    if ("vibrate" in navigator) {
+      navigator.
