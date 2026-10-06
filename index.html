@@ -4,51 +4,28 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Find My Phone</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
+body{background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:center;padding:20px;gap:12px;min-height:100vh}
+body.flash{background:#fff!important}
+.circle{width:170px;height:170px;border-radius:50%;border:5px solid #38bdf8;background:#1e293b;color:#38bdf8;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;cursor:pointer}
+.circle.on{border-color:#ef4444;color:#ef4444;animation:pulse 1s infinite}
+@keyframes pulse{0%{scale:1}50%{scale:1.08}100%{scale:1}}
+.card{width:100%;max-width:380px;background:#1e293b;border:1px solid #334155;border-radius:16px;padding:14px}
+.bar{height:20px;background:#000;border-radius:10px;overflow:hidden}
+.fill{height:100%;width:0%;background:#38bdf8}
+button{padding:10px;border-radius:8px;border:0;background:#334155;color:#fff;font-weight:600}
+button:active{scale:.97}
+</style>
 </head>
-<body style="background:#0f172a;color:white;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;padding:20px;gap:15px">
+<body>
 <h1 style="color:#38bdf8">Find My Phone</h1>
-<button id="btn" style="width:160px;height:160px;border-radius:50%;border:4px solid #38bdf8;background:#1e293b;color:#38bdf8;font-weight:bold;font-size:18px">🎤 ATIVAR</button>
-<p>Palmas: <span id="c">0</span>/5</p>
-<p>Sensibilidade: <span id="v">65</span></p>
-<input id="s" type="range" min="20" max="95" value="65" style="width:280px">
-<div id="barra" style="width:280px;height:20px;background:#111;border-radius:10px"><div id="fill" style="height:100%;width:0%;background:#38bdf8"></div></div>
-<button id="stop" style="display:none;background:red;color:white;padding:15px;border:none;border-radius:8px;width:280px">PARAR ALARME</button>
-<p id="msg"></p>
-<script>
-let ctx,ana,mic,on=false,al=false,count=0,last=0,st=null,cool=false;
-const btn=document.getElementById('btn'),c=document.getElementById('c'),s=document.getElementById('s'),v=document.getElementById('v'),fill=document.getElementById('fill'),stop=document.getElementById('stop'),msg=document.getElementById('msg');
-s.oninput=()=>v.textContent=s.value;
-btn.onclick=async()=>{
- if(!on){
-  ctx=new AudioContext(); ana=ctx.createAnalyser(); ana.fftSize=512;
-  let stream=await navigator.mediaDevices.getUserMedia({audio:true});
-  ctx.createMediaStreamSource(stream).connect(ana);
-  on=true; btn.textContent='OUVINDO...'; btn.style.borderColor='red'; btn.style.color='red';
-  loop();
- }else{ on=false; btn.textContent='🎤 ATIVAR'; btn.style.borderColor='#38bdf8'; btn.style.color='#38bdf8'; count=0; c.textContent=0; }
-};
-function loop(){
- if(!on) return;
- let b=new Uint8Array(ana.frequencyBinCount); ana.getByteFrequencyData(b);
- let sum=0; for(let x of b) sum+=x; let lvl=Math.round((sum/b.length)/1.5); if(lvl>100) lvl=100;
- fill.style.width=lvl+'%';
- let th=parseInt(s.value);
- let now=Date.now();
- if(count>0 && now-last>4000){count=0; c.textContent=0;}
- if(lvl>=th){
-  if(!st) st=now;
-  if(now-st>300 && !cool){ cool=true; count++; last=now; c.textContent=count; msg.textContent='Palma! '+count+'/5'; if(count>=5){count=0; c.textContent=0; alarm();} setTimeout(()=>cool=false,600); }
- }else st=null;
- requestAnimationFrame(loop);
-}
-function alarm(){
- al=true; stop.style.display='block'; msg.textContent='ACHOU!!';
- let ac=new AudioContext(); let o=ac.createOscillator(); let g=ac.createGain();
- o.connect(g); g.connect(ac.destination); o.start(); g.gain.value=1;
- let up=true; let id=setInterval(()=>{ if(!al){clearInterval(id); o.stop(); ac.close(); return;} o.frequency.value=up?1200:600; up=!up; document.body.style.background=up?'#fff':'#0f172a'; },250);
- if(navigator.vibrate) navigator.vibrate([600,200,600,200,600]);
-}
-stop.onclick=()=>{al=false; stop.style.display='none'; document.body.style.background='#0f172a'; msg.textContent='Parado'; if(navigator.vibrate) navigator.vibrate(0);}
-</script>
-</body>
-</html>
+<div id="mainBtn" class="circle"><span style="font-size:30px">🎤</span><span id="mainTxt">ATIVAR</span></div>
+<div>Palmas: <b id="cnt">0</b>/5</div>
+<div class="card">
+<div style="display:flex;justify-content:space-between">Sensibilidade <b id="sVal">20</b></div>
+<input id="sRange" type="range" min="10" max="90" value="20" style="width:100%">
+<div>Nível: <span id="lvl">0</span>/100</div>
+<div class="bar"><div id="fill" class="fill"></div></div>
+<div id="msg" style="text-align:center;color:#38bdf8;margin:8px 0">Parado</
+  
